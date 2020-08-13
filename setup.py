@@ -1,10 +1,13 @@
 import setuptools
+
+from version import __version__
+
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name='openvpn_aad_authenticator',
-    version='0.1',
+    version=__version__,
     scripts=['openvpn_aad_authenticator'],
     licence='MIT',
     author='Jan-Otto Kröpke',
@@ -23,5 +26,5 @@ setuptools.setup(
         'Environment :: Console',
         'Topic :: System :: Systems Administration :: Authentication/Directory',
     ],
-    install_requires=['msal', 'cacheout', 'PyYAML']
+    install_requires=['msal', 'cacheout', 'ConfigArgParse', 'prometheus_client']
 )

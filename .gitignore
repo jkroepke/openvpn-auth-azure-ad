@@ -1,7 +1,8 @@
 *.iml
 .idea
 
-venv
+contrib/.tmp
+!contrib/.tmp/.gitkeep
 
 ### Python template
 # Byte-compiled / optimized / DLL files

@@ -49,17 +49,28 @@ class OpenVPNManagementInterface(object):
         """
         try:
             if self.type == SocketType.IP:
-                self._socket = socket.create_connection((self._mgmt_host, self._mgmt_port), timeout=3)
+                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                self._socket.settimeout(5)
+                self._socket.connect(('{}'.format(self._mgmt_host), int(self._mgmt_port)))
             else:
                 self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self._socket.connect(self._mgmt_socket)
+
             resp = self._socket_recv()
 
             if resp.startswith("ENTER PASSWORD"):
-                self.send_command(self._mgmt_password)
-                resp = self._socket_recv()
+                resp = self.send_command(self._mgmt_password)
+                if not resp.startswith("SUCCESS: password is correct"):
+                    logger.critical("Wrong management interface password.")
 
-            assert resp.startswith(">INFO"), "Did not get expected response from interface when opening socket."
+                assert resp.startswith("SUCCESS: password is correct"), "Wrong management interface password."
+            else:
+                print(resp)
+                assert resp.startswith(">INFO"), "Did not get expected response from interface when opening socket."
+
+            logger.info("Connection to OpenVPN management interfaced established.")
             return True
         except (socket.timeout, socket.error) as e:
             raise errors.ConnectError(str(e)) from None
@@ -118,9 +129,6 @@ class OpenVPNManagementInterface(object):
         if cmd.startswith("kill") or cmd.startswith("client-kill"):
             return
         resp = self._socket_recv()
-        if cmd.strip() not in ("load-stats", "signal SIGTERM"):
-            while not resp.strip().endswith("END"):
-                resp += self._socket_recv()
         logger.debug("Cmd response: %r", resp)
         return resp
 

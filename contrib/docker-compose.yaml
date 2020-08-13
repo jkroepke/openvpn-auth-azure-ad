@@ -10,7 +10,7 @@ services:
     - 1194:1194/tcp
     - 8081:8081/tcp
     volumes:
-    - ./ovpn-config:/etc/openvpn
+    - ./.tmp/ovpn-config:/etc/openvpn
 
 networks:
   openvpn:
