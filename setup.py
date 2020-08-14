@@ -17,7 +17,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/jkroepke/openvpn_aad_authenticator',
+    download_url='https://github.com/jkroepke/helm-openvpn_aad_authenticator/archive/v%s.tar.gz' % __version__,
     packages=setuptools.find_packages(),
+    keywords=['OpenVPN', 'AzureAD', 'authentication'],
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
