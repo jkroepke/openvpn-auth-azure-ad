@@ -1,5 +1,5 @@
 from typing import Optional, Dict
-from lib.openvpn import OpenVPNManagementInterface
+from openvpn import OpenVPNManagementInterface
 from msal import PublicClientApplication
 from cacheout import Cache
 from util import errors

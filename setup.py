@@ -1,6 +1,13 @@
 import setuptools
 
 from version import __version__
+from pip._internal.req import parse_requirements
+
+
+def load_requirements(fname):
+    reqs = parse_requirements(fname, session="test")
+    return [str(ir.req) for ir in reqs]
+
 
 with open('README.md', 'r') as fh:
     long_description = fh.read()
@@ -9,7 +16,7 @@ setuptools.setup(
     name='openvpn_aad_authenticator',
     version=__version__,
     scripts=['openvpn_aad_authenticator'],
-    licence='MIT',
+    license='MIT',
     author='Jan-Otto Kröpke',
     author_email='pip@jkroepke.de',
     description='openvpn_aad_authenticator connects to the openvpn management interface and handle the authentication '

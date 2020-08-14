@@ -1,3 +1,7 @@
+contrib
+Dockerfile
+.*
+
 *.iml
 .idea
 
@@ -21,7 +25,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-openvpn/
+lib/
 lib64/
 parts/
 sdist/
