@@ -1,3 +1,11 @@
+[![CI](https://github.com/jkroepke/openvpn-auth-azure-ad/workflows/CI/badge.svg)](https://github.com/jkroepke/openvpn-auth-azure-ad/actions?query=workflow%3ACI)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/jkroepke/openvpn-auth-azure-ad?logo=github&sort=semver)](https://github.com/jkroepke/openvpn-auth-azure-ad/releases/latest)
+[![GitHub All Releases](https://img.shields.io/github/downloads/jkroepke/openvpn-auth-azure-ad/total?logo=github)](https://github.com/jkroepke/openvpn-auth-azure-ad/releases)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/openvpn-auth-azure-ad)](https://pypi.org/project/openvpn-auth-azure-ad/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jkroepke/openvpn-auth-azure-ad?logo=docker)](https://hub.docker.com/r/jkroepke/openvpn-auth-azure-ad)
+[![GitHub license](https://img.shields.io/github/license/jkroepke/openvpn-auth-azure-ad)](https://github.com/jkroepke/openvpn-auth-azure-ad/blob/master/LICENSE.txt)
+
+
 # openvpn-auth-azure-ad
 openvpn-auth-azure-ad is an external service that
 connects to the openvpn management interface and handle the authentication against Azure AD.
@@ -35,6 +43,8 @@ then authenticator above on re-authentications, e.g. due `reneg-sec`.
 For install pip on your system, see [pip docs](https://pip.pypa.io/en/stable/installing/).
 
 ## via docker
+
+https://hub.docker.com/r/jkroepke/openvpn-auth-azure-ad
 
 ```
 # docker run --rm \
