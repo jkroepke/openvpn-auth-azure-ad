@@ -5,28 +5,33 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/jkroepke/openvpn-auth-azure-ad?logo=docker)](https://hub.docker.com/r/jkroepke/openvpn-auth-azure-ad)
 [![GitHub license](https://img.shields.io/github/license/jkroepke/openvpn-auth-azure-ad)](https://github.com/jkroepke/openvpn-auth-azure-ad/blob/master/LICENSE.txt)
 
-
 # openvpn-auth-azure-ad
+
 openvpn-auth-azure-ad is an external service that
 connects to the openvpn management interface and handle the authentication against Azure AD.
 
 OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ## Tested environment
+
 ### Python
-* Python 3.8
+
+- Python 3.8
 
 ### Server
-* OpenVPN 2.4.9
+
+- OpenVPN 2.4.9
 
 ### Client
-* Tunnelblick 3.8.3
+
+- Tunnelblick 3.8.3
 
 # Authenticators
+
 Currently, openvpn-auth-azure-ad supports 2 authentication method against Azure AD:
 
-* [Device token code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
-* [Resource Owner Password Credentials grant](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc)
+- [Device token code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
+- [Resource Owner Password Credentials grant](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc)
   (not recommend, see docs for limitations)
 
 Additionally, if enabled openvpn-auth-azure-ad supports OpenVPNs `auth-token` mechanismus to allow users to bypass
@@ -114,6 +119,7 @@ Prometheus settings:
 ## Required settings on OpenVPN configuration files
 
 ### server.conf
+
 ```
 management socket-name unix [pw-file]
 management-client-auth
@@ -123,6 +129,7 @@ See [Reference manual for OpenVPN](https://openvpn.net/community-resources/refer
 for detailed `management` settings.
 
 ### client.conf
+
 ```
 auth-user-pass
 auth-retry interact
@@ -138,10 +145,11 @@ the prometheus endpoint listen on port 9723.
 
 ## Related projects
 
-* https://github.com/CyberNinjas/openvpn-auth-aad
-* https://github.com/stilljake/openvpn-azure-ad-auth
+- https://github.com/CyberNinjas/openvpn-auth-aad
+- https://github.com/stilljake/openvpn-azure-ad-auth
 
 ## Copyright and license
+
 © [2020 Jan-Otto Kröpke (jkroepke)](https://github.com/jkroepke/helm-secrets)
 
 Licensed under the [MIT License](LICENSE.txt)
