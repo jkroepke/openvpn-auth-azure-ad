@@ -7,7 +7,7 @@ import logging
 
 from authenticator import AADAuthenticator, AADAuthenticatorFlows
 from prometheus_client import start_http_server, Info
-from version import __version__
+from _version import __version__
 
 parser = configargparse.ArgParser(default_config_files=[
     '/etc/openvpn_aad_authenticator/config.conf', '~/.openvpn_aad_authenticator'
