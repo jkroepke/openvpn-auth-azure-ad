@@ -1,6 +1,5 @@
 import base64
-from typing import Optional, List
-from util import errors
+from typing import Optional
 
 
 def b64encode_string(s: str) -> str:
@@ -8,7 +7,7 @@ def b64encode_string(s: str) -> str:
 
 
 def is_authenticated(result: dict) -> bool:
-    return 'access_token' in result
+    return "access_token" in result
 
 
 def format_error(result: dict) -> str:
@@ -16,10 +15,10 @@ def format_error(result: dict) -> str:
 
 
 def get_state_id(client: dict) -> Optional[str]:
-    if 'password' not in client['env']:
+    if "password" not in client["env"]:
         return None
 
-    password = client['env']['password'].split("::")
+    password = client["env"]["password"].split("::")
     if len(password) < 2:
         return None
 
@@ -27,12 +26,12 @@ def get_state_id(client: dict) -> Optional[str]:
 
 
 def get_auth_token(client: dict) -> Optional[str]:
-    if 'password' not in client['env']:
+    if "password" not in client["env"]:
         return None
 
-    return client['env']['password']
+    return client["env"]["password"]
 
 
 def format_client_challenge(client: dict, challenge) -> str:
-    username_b64 = b64encode_string(client['env']['username'])
-    return 'CRV1:E,R:%s:%s:%s' % (client['state_id'], username_b64, challenge)
+    username_b64 = b64encode_string(client["env"]["username"])
+    return "CRV1:E,R:%s:%s:%s" % (client["state_id"], username_b64, challenge)
