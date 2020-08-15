@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-import configargparse
-import os
-import msal
 import logging
+import os
 
-from authenticator import AADAuthenticator, AADAuthenticatorFlows
-from prometheus_client import start_http_server, Info
+import configargparse
+import msal
+from prometheus_client import Info, start_http_server
+
 from _version import __version__
+from authenticator import AADAuthenticator, AADAuthenticatorFlows
 
 parser = configargparse.ArgParser(
     default_config_files=[

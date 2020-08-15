@@ -1,16 +1,17 @@
-from typing import Optional, Dict
-from openvpn import OpenVPNManagementInterface
-from msal import PublicClientApplication
+import json
+import logging
+import time
+import uuid
+from typing import Dict, Optional
+
 from cacheout import CacheManager
-from util import errors
+from msal import PublicClientApplication
 from prometheus_client import Counter
-from _version import __version__
 
 import util
-import uuid
-import logging
-import json
-import time
+from _version import __version__
+from openvpn import OpenVPNManagementInterface
+from util import errors
 
 openvpn_aad_authenticator_events = Counter(
     "openvpn_aad_authenticator_events", "track events", ["event"]

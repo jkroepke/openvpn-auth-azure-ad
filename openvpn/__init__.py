@@ -1,10 +1,10 @@
-import logging
-import socket
-import util.errors as errors
 import contextlib
+import logging
 import select
+import socket
+from typing import Generator, Optional
 
-from typing import Optional, Generator
+import util.errors as errors
 
 logger = logging.getLogger(__name__)
 
