@@ -15,5 +15,6 @@ jobs:
     - uses: actions/setup-python@v1
     - uses: ricardochaves/python-lint@v1.1.0
       with:
+        python-root-list: "openvpn_auth_azure_ad"
         use-isort: false
         use-mypy: false
