@@ -1,7 +1,7 @@
 from typing import Optional, Dict
 from openvpn import OpenVPNManagementInterface
 from msal import PublicClientApplication
-from cacheout import Cache
+from cacheout import CacheManager
 from util import errors
 from prometheus_client import Counter
 from version import __version__
@@ -38,11 +38,11 @@ class AADAuthenticator(object):
         self._authenticators = [s.strip() for s in authenticators.split(',')]
         self._openvpn = OpenVPNManagementInterface(host, port, socket, password)
         self._openvpn.connect()
-        self._states = Cache(maxsize=256, ttl=600)
-        self._auth_token_enabled = auth_token
+        self._states = CacheManager({'challenge': {'maxsize': 256, 'ttl': 600},
+                                     'authenticated': {'maxsize': 256, 'ttl': 0},
+                                     'auth_token': {'maxsize': 256, 'ttl': 86400}})
 
-        if self._auth_token_enabled:
-            self._auth_token_state = Cache(maxsize=256, ttl=0)
+        self._auth_token_enabled = auth_token
 
     def run(self) -> None:
         logger.info('Running openvpn_aad_authenticator %s' % __version__)
@@ -58,36 +58,42 @@ class AADAuthenticator(object):
                     if message.startswith(">CLIENT:DISCONNECT"):
                         self.client_disconnect(message)
 
-                    if message.startswith(">CLIENT:CONNECT"):
+                    elif message.startswith(">CLIENT:CONNECT"):
                         self.client_connect(message)
 
-                    if message.startswith(">CLIENT:REAUTH"):
+                    elif message.startswith(">CLIENT:REAUTH"):
                         self.client_reauth(message)
 
-                self._states.delete_expired()
+                self._states['challenge'].delete_expired()
+                self._states['auth_token'].delete_expired()
         except Exception as e:
             logger.error(str(e), exc_info=e)
 
-    def send_authentication_success(self, client: dict, result: dict) -> None:
+    def send_authentication_success(self, client: dict) -> None:
         self.log_info(client, 'authentication succeeded')
         if self._auth_token_enabled:
             auth_token = str(uuid.uuid1())
-            self._auth_token_state.set(auth_token, {'client': client, 'result': result})
+            self._states['auth_token'].set(auth_token, client['state_id'])
             self._openvpn.send_command(
                 "client-auth %s %s\npush \"auth-token %s\"\nEND" % (client['cid'], client['kid'], auth_token))
         else:
             self._openvpn.send_command('client-auth-nt %s %s' % (client['cid'], client['kid']))
 
-    def send_authentication_challenge(self, client: Dict, state_id, message: str) -> None:
-        self.log_debug(client, 'authentication challenge: %s' % message)
-        client_challenge = 'CRV1:E,R:%s:%s:%s' % (state_id, util.b64encode_string(client['env']['username']), message)
+    def send_authentication_challenge(self, client: Dict, client_message: str) -> None:
+        self.log_debug(client, 'authentication challenge: %s' % client_message)
 
+        client_challenge = util.format_client_challenge(client, client_message)
         self._openvpn.send_command('client-deny %s %s "%s" "%s"'
                                    % (client['cid'], client['kid'], 'client_challenge', client_challenge))
 
-    def send_authentication_error(self, client: Dict, message: str) -> None:
-        self._openvpn.send_command('client-deny %s %s "%s" "%s"'
-                                   % (client['cid'], client['kid'], message, message))
+    def send_authentication_error(self, client: Dict, message: str, client_message: Optional[str]) -> None:
+        if client_message is None:
+            self._openvpn.send_command('client-deny %s %s "%s" "%s"'
+                                       % (client['cid'], client['kid'], message, message))
+        else:
+            client_challenge = util.format_client_challenge(client, client_message)
+            self._openvpn.send_command('client-deny %s %s "%s" "%s"'
+                                       % (client['cid'], client['kid'], message, client_challenge))
 
     def handle_reauth(self, client: Dict) -> Optional[dict]:
         if not self._auth_token_enabled:
@@ -95,24 +101,37 @@ class AADAuthenticator(object):
 
         openvpn_aad_authenticator_auth_total.labels(AADAuthenticatorFlows.AUTH_TOKEN).inc()
 
+        # Get Auth-Token from Request
         auth_token = util.get_auth_token(client)
         if auth_token is None:
             return None
 
-        state = self._auth_token_state.get(auth_token)
-        if state is None:
+        # Receive state_id by auth-token
+        state_id = self._states['auth_token'].get(auth_token)
+        if state_id is None:
             return None
 
-        if 'result' not in state or 'client' not in state:
+        # Delete auth-token from auth-token state
+        self._states['auth_token'].delete(auth_token)
+
+        # Get authenticated state
+        authenticated_state = self._states['authenticated'].get(state_id)
+        if authenticated_state is None:
+            return None
+
+        # check is authenticated state has required objects
+        if 'result' not in authenticated_state or 'client' not in authenticated_state:
             return None
 
         self.log_info(client, 'Authenticate using auth-token flow')
 
-        if client['env']['common_name'] != state['client']['env']['common_name'] \
-                or client['env']['username'] != state['client']['env']['username']:
+        # recheck if connected client is the same as inside the state.
+        if client['env']['common_name'] != authenticated_state['client']['env']['common_name'] \
+                or client['env']['username'] != authenticated_state['client']['env']['username']:
             return None
 
-        result = self._app.acquire_token_by_refresh_token(state['result']['refresh_token'], scopes=self.token_scopes)
+        # check if user is active inside azure ad by using a refresh token
+        result = self._app.acquire_token_by_refresh_token(authenticated_state['result']['refresh_token'], scopes=self.token_scopes)
 
         return result
 
@@ -120,15 +139,20 @@ class AADAuthenticator(object):
         if not client['env']['password'].startswith("CRV1::"):
             return None
 
+        # get state id from client
         state_id = util.get_state_id(client)
         if state_id is None:
             return None
 
-        state = self._states.get(state_id)
-        self._states.delete(state_id)
+        # get state from challenge state and check if exists
+        state = self._states['challenge'].get(state_id)
         if state is None:
             return None
 
+        # delete used challenge state
+        self._states['challenge'].delete(state_id)
+
+        # Check if required properties exist in state
         if 'flow' not in state:
             return None
 
@@ -155,38 +179,39 @@ class AADAuthenticator(object):
         self.authenticate_client(client)
 
     def authenticate_client(self, client: dict) -> None:
-        result = {}
-
         if client['reason'] == 'reauth':
+            # allow clients to bypass azure ad authentication by reauthenticate via auth-token
             result = self.handle_reauth(client)
             if result is not None:
                 if util.is_authenticated(result):
                     openvpn_aad_authenticator_auth_succeeded.labels(AADAuthenticatorFlows.AUTH_TOKEN).inc()
                     self.log_info(client, 'auth-token flow succeeded')
-                    self.send_authentication_success(client, result)
+                    self.send_authentication_success(client)
                     return
 
         if AADAuthenticatorFlows.DEVICE_TOKEN in self._authenticators:
             result = self.handle_response_challenge(client)
             if result is not None:
-                self._states.expired(util.get_state_id(client))
+                client['state_id'] = util.get_state_id(client)
 
                 if util.is_authenticated(result):
+                    self._states['authenticated'].set(client['state_id'], {'client': client, 'result': result})
                     openvpn_aad_authenticator_auth_succeeded.labels(AADAuthenticatorFlows.DEVICE_TOKEN).inc()
                     self.log_info(client, 'device token flow succeeded')
-                    self.send_authentication_success(client, result)
+                    self.send_authentication_success(client)
                     return
                 else:
                     openvpn_aad_authenticator_auth_failures.labels(AADAuthenticatorFlows.DEVICE_TOKEN).inc()
                     if 70016 in result.get("error_codes", []):
                         error = 'device token flow errored: no user action'
                         self.log_info(client, error)
-                        self.send_authentication_error(client, error)
+                        self.send_authentication_error(client, error, None)
                     else:
                         self.log_info(client, 'device token flow errored: %s ' % util.format_error(result))
-                        self.send_authentication_error(client, util.format_error(result))
+                        self.send_authentication_error(client, util.format_error(result), None)
                     return
 
+        client['state_id'] = str(uuid.uuid1())
         if AADAuthenticatorFlows.USER_PASSWORD in self._authenticators:
             self.log_debug(client, 'Authenticate using username/password flow')
             openvpn_aad_authenticator_auth_total.labels(AADAuthenticatorFlows.USER_PASSWORD).inc()
@@ -197,37 +222,36 @@ class AADAuthenticator(object):
                 openvpn_aad_authenticator_auth_failures.labels(AADAuthenticatorFlows.USER_PASSWORD).inc()
                 if 65001 in result.get("error_codes", []):
                     # AAD requires user consent for U/P flow
-                    error = "Get consent first:", self._app.get_authorization_request_url(self.token_scopes)
+                    error = "Get consent first: %s" % self._app.get_authorization_request_url(self.token_scopes)
+                    self.send_authentication_error(client, 'consent_needed', error)
                 else:
                     error = util.format_error(result)
+                    self.send_authentication_error(client, error, None)
 
                 self.log_info(client, 'password flow errored: %s' % (error,))
-                self.send_authentication_error(client, error)
                 return
 
             openvpn_aad_authenticator_auth_succeeded.labels(AADAuthenticatorFlows.USER_PASSWORD).inc()
             self.log_info(client, 'password flow succeeded')
+            # Do not send successful auth command, because device token can be enabled.
 
         if AADAuthenticatorFlows.DEVICE_TOKEN in self._authenticators:
             self.log_info(client, 'Start to authenticate using device token flow')
-            state_id = str(uuid.uuid1())
             flow = self.device_auth_start()
-            message = flow['message'] + ". Then press OK."
+            message = flow['message'] + " Then press OK here. No input required here."
 
-            self.log_debug(client, 'Save state as %s' % state_id)
-            self._states.set(state_id, {'client': client, 'flow': flow})
+            self.log_debug(client, 'Save state as %s' % client['state_id'])
+            self._states['challenge'].set(client['state_id'], {'flow': flow})
 
             openvpn_aad_authenticator_auth_total.labels(AADAuthenticatorFlows.DEVICE_TOKEN).inc()
-            self.send_authentication_challenge(client, state_id, message)
+            self.send_authentication_challenge(client, message)
             return
 
-        self.send_authentication_success(client, result)
+        self.send_authentication_success(client)
         return
 
     def device_auth_start(self) -> dict:
         flow = self._app.initiate_device_flow(scopes=self.token_scopes)
-        flow["expires_in"] = 30
-        flow["expires_at"] = time.time() + flow["expires_in"]
 
         if "user_code" not in flow:
             raise ValueError("Fail to create device flow. Err: %s" % json.dumps(flow, indent=4))
@@ -235,6 +259,10 @@ class AADAuthenticator(object):
         return flow
 
     def device_token_finish(self, state: dict) -> dict:
+        # Block authentication at least for 30 seconds
+        state['flow']["expires_in"] = 30
+        state['flow']["expires_at"] = time.time() + state['flow']["expires_in"]
+
         return self._app.acquire_token_by_device_flow(state['flow'])
 
     @staticmethod
@@ -244,6 +272,7 @@ class AADAuthenticator(object):
             'reason': None,
             'cid': None,
             'kid': None,
+            'state_id': None,
         }
 
         for line in data.splitlines():

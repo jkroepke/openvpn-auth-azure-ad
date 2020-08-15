@@ -28,6 +28,7 @@ class OpenVPNManagementInterface(object):
             self._type = SocketType.IP
         self._mgmt_password = password
         self._socket = None
+        self._release = None
 
     @property
     def type(self) -> Optional[str]:
@@ -71,6 +72,8 @@ class OpenVPNManagementInterface(object):
                 assert resp.startswith(">INFO"), "Did not get expected response from interface when opening socket."
 
             logger.info("Connection to OpenVPN management interfaced established.")
+            self._get_version()
+
             return True
         except (socket.timeout, socket.error) as e:
             raise errors.ConnectError(str(e)) from None
@@ -89,6 +92,14 @@ class OpenVPNManagementInterface(object):
         """Determine if management interface socket is connected or not.
         """
         return self._socket is not None
+
+    @property
+    def release(self) -> str:
+        """OpenVPN release string.
+        """
+        if self._release is None:
+            self._release = self._get_version()
+        return self._release
 
     @contextlib.contextmanager
     def connection(self) -> Generator:
@@ -131,6 +142,15 @@ class OpenVPNManagementInterface(object):
         resp = self._socket_recv()
         logger.debug("Cmd response: %r", resp)
         return resp
+
+    def _get_version(self) -> str:
+        """Get OpenVPN version from socket.
+        """
+        raw = self.send_command("version")
+        for line in raw.splitlines():
+            if line.startswith("OpenVPN Version"):
+                return line.replace("OpenVPN Version: ", "")
+        raise errors.ParseError("Unable to get OpenVPN version, no matches found in socket response.")
 
     def wait_for_data(self) -> str:
         """Poll for incoming data

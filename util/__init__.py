@@ -1,6 +1,5 @@
 import base64
 from typing import Optional, List
-
 from util import errors
 
 
@@ -32,3 +31,8 @@ def get_auth_token(client: dict) -> Optional[str]:
         return None
 
     return client['env']['password']
+
+
+def format_client_challenge(client: dict, challenge) -> str:
+    username_b64 = b64encode_string(client['env']['username'])
+    return 'CRV1:E,R:%s:%s:%s' % (client['state_id'], username_b64, challenge)
