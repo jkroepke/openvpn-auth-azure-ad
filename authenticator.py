@@ -131,7 +131,8 @@ class AADAuthenticator(object):
             return None
 
         # check if user is active inside azure ad by using a refresh token
-        result = self._app.acquire_token_by_refresh_token(authenticated_state['result']['refresh_token'], scopes=self.token_scopes)
+        result = self._app.acquire_token_by_refresh_token(authenticated_state['result']['refresh_token'],
+                                                          scopes=self.token_scopes)
 
         return result
 
