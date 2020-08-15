@@ -1,6 +1,5 @@
 import base64
-from typing import Optional, List
-from util import errors
+from typing import Optional
 
 
 def b64encode_string(s: str) -> str:
