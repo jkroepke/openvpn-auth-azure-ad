@@ -1,3 +1,3 @@
 """Expose core parts to module namespace."""
-import openvpn
+from .openvpn import OpenVPNManagementInterface
 from .util import errors
