@@ -4,7 +4,7 @@ import select
 import socket
 from typing import Generator, Optional
 
-import util.errors as errors
+import openvpn_auth_azure_ad.util.errors as errors
 
 logger = logging.getLogger(__name__)
 

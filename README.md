@@ -5,10 +5,13 @@ connects to the openvpn management interface and handle the authentication again
 OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ## Tested environment
-## Server
+### Python
+* Python 3.8
+
+### Server
 * OpenVPN 2.4.9
 
-## Client
+### Client
 * Tunnelblick 3.8.3
 
 # Authenticators

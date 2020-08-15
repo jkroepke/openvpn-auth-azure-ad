@@ -8,10 +8,10 @@ from cacheout import CacheManager
 from msal import PublicClientApplication
 from prometheus_client import Counter
 
-import util
-from _version import __version__
-from openvpn import OpenVPNManagementInterface
-from util import errors
+from openvpn_auth_azure_ad import util
+from openvpn_auth_azure_ad._version import __version__
+from openvpn_auth_azure_ad.openvpn import OpenVPNManagementInterface
+from openvpn_auth_azure_ad.util import errors
 
 openvpn_auth_azure_ad_events = Counter(
     "openvpn_auth_azure_ad_events", "track events", ["event"]

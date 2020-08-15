@@ -1,6 +1,6 @@
 import setuptools
 
-from _version import __version__
+from openvpn_auth_azure_ad._version import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="openvpn-auth-azure-ad",
     version=__version__,
-    scripts=["openvpn-auth-azure-ad"],
+    scripts=["openvpn_auth_azure_ad/openvpn-auth-azure-ad"],
     license="MIT",
     author="Jan-Otto Kröpke",
     author_email="pip@jkroepke.de",

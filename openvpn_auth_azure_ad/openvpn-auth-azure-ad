@@ -7,8 +7,8 @@ import configargparse
 import msal
 from prometheus_client import Info, start_http_server
 
-from _version import __version__
-from authenticator import AADAuthenticator, AADAuthenticatorFlows
+from openvpn_auth_azure_ad._version import __version__
+from openvpn_auth_azure_ad.authenticator import AADAuthenticator, AADAuthenticatorFlows
 
 parser = configargparse.ArgParser(
     default_config_files=[
