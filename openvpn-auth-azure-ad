@@ -12,8 +12,8 @@ from authenticator import AADAuthenticator, AADAuthenticatorFlows
 
 parser = configargparse.ArgParser(
     default_config_files=[
-        "/etc/openvpn_aad_authenticator/config.conf",
-        "~/.openvpn_aad_authenticator",
+        "/etc/openvpn-auth-azure-ad/config.conf",
+        "~/.openvpn-auth-azure-ad",
     ]
 )
 
@@ -132,7 +132,7 @@ logging.basicConfig(
 
 if options.prometheus:
     start_http_server(options.prometheus_listen_port, options.prometheus_listen_addr)
-    i = Info("openvpn_aad_authenticator_version", "info of openvpn_aad_authenticator")
+    i = Info("openvpn_auth_azure_ad_version", "info of openvpn-auth-azure-ad")
     i.info({"version": __version__})
 
 app = msal.PublicClientApplication(options.client_id, authority=options.token_authority)

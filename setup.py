@@ -6,18 +6,18 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="openvpn_aad_authenticator",
+    name="openvpn-auth-azure-ad",
     version=__version__,
-    scripts=["openvpn_aad_authenticator"],
+    scripts=["openvpn-auth-azure-ad"],
     license="MIT",
     author="Jan-Otto Kröpke",
     author_email="pip@jkroepke.de",
-    description="openvpn_aad_authenticator connects to the openvpn management interface and handle the authentication "
+    description="openvpn-auth-azure-ad connects to the openvpn management interface and handle the authentication "
     "ageist Azure AD.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jkroepke/openvpn_aad_authenticator",
-    download_url="https://github.com/jkroepke/helm-openvpn_aad_authenticator/archive/v%s.tar.gz"
+    url="https://github.com/jkroepke/openvpn-auth-azure-ad",
+    download_url="https://github.com/jkroepke/openvpn-auth-azure-ad/archive/v%s.tar.gz"
     % __version__,
     packages=setuptools.find_packages(),
     keywords=["OpenVPN", "AzureAD", "authentication"],

@@ -13,17 +13,17 @@ from _version import __version__
 from openvpn import OpenVPNManagementInterface
 from util import errors
 
-openvpn_aad_authenticator_events = Counter(
-    "openvpn_aad_authenticator_events", "track events", ["event"]
+openvpn_auth_azure_ad_events = Counter(
+    "openvpn_auth_azure_ad_events", "track events", ["event"]
 )
-openvpn_aad_authenticator_auth_total = Counter(
-    "openvpn_aad_authenticator_auth_total", "auth total", ["flow"]
+openvpn_auth_azure_ad_auth_total = Counter(
+    "openvpn_auth_azure_ad_auth_total", "auth total", ["flow"]
 )
-openvpn_aad_authenticator_auth_succeeded = Counter(
-    "openvpn_aad_authenticator_auth_succeeded", "auth succeeded", ["flow"]
+openvpn_auth_azure_ad_auth_succeeded = Counter(
+    "openvpn_auth_azure_ad_auth_succeeded", "auth succeeded", ["flow"]
 )
-openvpn_aad_authenticator_auth_failures = Counter(
-    "openvpn_aad_authenticator_auth_failures", "auth failures", ["flow"]
+openvpn_auth_azure_ad_auth_failures = Counter(
+    "openvpn_auth_azure_ad_auth_failures", "auth failures", ["flow"]
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class AADAuthenticator(object):
         self._auth_token_enabled = auth_token
 
     def run(self) -> None:
-        logger.info("Running openvpn_aad_authenticator %s" % __version__)
+        logger.info("Running openvpn-auth-azure-ad %s" % __version__)
         try:
             while True:
                 data = self._openvpn.wait_for_data()
@@ -131,7 +131,7 @@ class AADAuthenticator(object):
         if not self._auth_token_enabled:
             return None
 
-        openvpn_aad_authenticator_auth_total.labels(
+        openvpn_auth_azure_ad_auth_total.labels(
             AADAuthenticatorFlows.AUTH_TOKEN
         ).inc()
 
@@ -204,18 +204,18 @@ class AADAuthenticator(object):
     def client_connect(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
         self.log_info(client, "Received client connect")
-        openvpn_aad_authenticator_events.labels("connect").inc()
+        openvpn_auth_azure_ad_events.labels("connect").inc()
         self.authenticate_client(client)
 
     def client_disconnect(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
         self.log_info(client, "Received client disconnect event")
-        openvpn_aad_authenticator_events.labels("disconnect").inc()
+        openvpn_auth_azure_ad_events.labels("disconnect").inc()
 
     def client_reauth(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
         self.log_info(client, "Received client re auth event")
-        openvpn_aad_authenticator_events.labels("reauth").inc()
+        openvpn_auth_azure_ad_events.labels("reauth").inc()
         self.authenticate_client(client)
 
     def authenticate_client(self, client: dict) -> None:
@@ -224,7 +224,7 @@ class AADAuthenticator(object):
             result = self.handle_reauth(client)
             if result is not None:
                 if util.is_authenticated(result):
-                    openvpn_aad_authenticator_auth_succeeded.labels(
+                    openvpn_auth_azure_ad_auth_succeeded.labels(
                         AADAuthenticatorFlows.AUTH_TOKEN
                     ).inc()
                     self.log_info(client, "auth-token flow succeeded")
@@ -240,14 +240,14 @@ class AADAuthenticator(object):
                     self._states["authenticated"].set(
                         client["state_id"], {"client": client, "result": result}
                     )
-                    openvpn_aad_authenticator_auth_succeeded.labels(
+                    openvpn_auth_azure_ad_auth_succeeded.labels(
                         AADAuthenticatorFlows.DEVICE_TOKEN
                     ).inc()
                     self.log_info(client, "device token flow succeeded")
                     self.send_authentication_success(client)
                     return
                 else:
-                    openvpn_aad_authenticator_auth_failures.labels(
+                    openvpn_auth_azure_ad_auth_failures.labels(
                         AADAuthenticatorFlows.DEVICE_TOKEN
                     ).inc()
                     if 70016 in result.get("error_codes", []):
@@ -268,7 +268,7 @@ class AADAuthenticator(object):
         client["state_id"] = str(uuid.uuid1())
         if AADAuthenticatorFlows.USER_PASSWORD in self._authenticators:
             self.log_debug(client, "Authenticate using username/password flow")
-            openvpn_aad_authenticator_auth_total.labels(
+            openvpn_auth_azure_ad_auth_total.labels(
                 AADAuthenticatorFlows.USER_PASSWORD
             ).inc()
             result = self._app.acquire_token_by_username_password(
@@ -278,7 +278,7 @@ class AADAuthenticator(object):
             )
 
             if not util.is_authenticated(result):
-                openvpn_aad_authenticator_auth_failures.labels(
+                openvpn_auth_azure_ad_auth_failures.labels(
                     AADAuthenticatorFlows.USER_PASSWORD
                 ).inc()
                 if 65001 in result.get("error_codes", []):
@@ -295,7 +295,7 @@ class AADAuthenticator(object):
                 self.log_info(client, "password flow errored: %s" % (error,))
                 return
 
-            openvpn_aad_authenticator_auth_succeeded.labels(
+            openvpn_auth_azure_ad_auth_succeeded.labels(
                 AADAuthenticatorFlows.USER_PASSWORD
             ).inc()
             self.log_info(client, "password flow succeeded")
@@ -309,7 +309,7 @@ class AADAuthenticator(object):
             self.log_debug(client, "Save state as %s" % client["state_id"])
             self._states["challenge"].set(client["state_id"], {"flow": flow})
 
-            openvpn_aad_authenticator_auth_total.labels(
+            openvpn_auth_azure_ad_auth_total.labels(
                 AADAuthenticatorFlows.DEVICE_TOKEN
             ).inc()
             self.send_authentication_challenge(client, message)

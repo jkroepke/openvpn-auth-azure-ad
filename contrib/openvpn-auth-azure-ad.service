@@ -1,0 +1,16 @@
+[Unit]
+Description=openvpn-auth-azure-ad
+After=openvpn.service
+Wants=openvpn.service
+PartOf=openvpn.service
+ReloadPropagatedFrom=openvpn.service
+Documentation=https://github.com/jkroepke/openvpn_aad_authenticator
+
+[Service]
+PrivateTmp=true
+ExecStart=/usr/bin/openvpn_aad_authenticator
+ProtectSystem=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
