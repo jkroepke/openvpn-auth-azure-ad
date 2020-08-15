@@ -29,6 +29,8 @@ then authenticator above on re-authentications, e.g. due `reneg-sec`.
 # pip install openvpn-auth-azure-ad
 ```
 
+For install pip on your system, see [pip docs](https://pip.pypa.io/en/stable/installing/).
+
 ## via docker
 
 ```

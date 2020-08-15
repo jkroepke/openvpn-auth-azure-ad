@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [0.0.3] - 2020-08-16
+
+- fixed pip release
+
 ## [0.0.2] - 2020-08-16
 
 - add auth-token support
@@ -20,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release
 
-[Unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v0.0.3
 [0.0.2]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v0.0.2
 [0.0.1]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v0.0.1
