@@ -292,7 +292,7 @@ class AADAuthenticator(object):
                     client['env'][client_env[0]] = client_env[1] if len(client_env) == 2 else ''
                 else:
                     raise errors.ParseError("Can't parse line: %s" % (line,))
-            except Exception as e:
+            except Exception:
                 raise errors.ParseError("Can't parse line: %s" % (line,))
 
         return client
