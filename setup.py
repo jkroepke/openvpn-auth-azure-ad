@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import setuptools
 
 from openvpn_auth_azure_ad._version import __version__

@@ -41,7 +41,14 @@ jobs:
             * https://github.com/jkroepke/openvpn-auth-azure-ad/blob/${{ steps.get_version.outputs.VERSION }}/CHANGELOG.md
             ## DockerHub
             * https://hub.docker.com/r/jkroepke/openvpn-auth-azure-ad/tags?name=${{ steps.get_version.outputs.VERSION }}
-
+  pypi:
+    name: Upload to PyPi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v1
+      - name: Create dist package
+        run: python3 setup.py sdist
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@master
         with:

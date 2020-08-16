@@ -18,13 +18,3 @@ jobs:
         python-root-list: "openvpn_auth_azure_ad"
         use-isort: false
         use-mypy: false
-  publish:
-    runs-on: ubuntu-18.04
-    name: Linting
-    steps:
-    - name: Publish package
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        user: __token__
-        password: ${{ secrets.pypi_password }}

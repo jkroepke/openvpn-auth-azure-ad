@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [1.0.1] - 2020-08-16
+
+- Fixed release automation
+
 ## [1.0.0] - 2020-08-16
 
 - First official release
@@ -37,7 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release
 
-[unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v1.0.1
 [1.0.0]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v1.0.0
 [0.0.5]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v0.0.5
 [0.0.4]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v0.0.4
