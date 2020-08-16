@@ -162,6 +162,7 @@ class OpenVPNManagementInterface(object):
 
             line = self._socket_file.readline().strip()
             if not line:
+                self._recv_queue.put(None)
                 break
 
             if line.startswith("SUCCESS:") or line.startswith("ERROR:"):
