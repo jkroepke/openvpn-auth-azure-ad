@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
-import setuptools
+import os
+import setuptools  # type: ignore
 
 from openvpn_auth_azure_ad._version import __version__
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+here = os.path.abspath(os.path.dirname(__file__))
+
+# Get the long description from the README file
+with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
+    long_description = f.read()
 
 setuptools.setup(
     name="openvpn-auth-azure-ad",
@@ -30,5 +34,9 @@ setuptools.setup(
         "Environment :: Console",
         "Topic :: System :: Systems Administration :: Authentication/Directory",
     ],
-    install_requires=["msal", "cacheout", "ConfigArgParse", "prometheus_client"],
+    install_requires=["msal", "cacheout", "ConfigArgParse", "prometheus_client", "concurrent-log-handler"],
+    project_urls={
+        "Source": "https://github.com/jkroepke/openvpn-auth-azure-ad",
+        "Bug Reports": "https://github.com/jkroepke/openvpn-auth-azure-ad/issues",
+    },
 )

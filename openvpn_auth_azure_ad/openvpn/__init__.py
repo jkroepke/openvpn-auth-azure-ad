@@ -1,12 +1,17 @@
 import contextlib
 import logging
-import select
+import queue
+import re
 import socket
+import threading
 from typing import Generator, Optional
 
 import openvpn_auth_azure_ad.util.errors as errors
 
 logger = logging.getLogger(__name__)
+
+FIRST_LINE_REGEX = re.compile(r"^>CLIENT:(?P<event>([^,]+))(.*)$")
+LAST_LINE_REGEX = re.compile(r"^(?:>CLIENT:ENV,)?END$")
 
 
 class SocketType:
@@ -41,6 +46,15 @@ class OpenVPNManagementInterface(object):
         self._socket = None
         self._release = None
 
+        self._socket_file = None
+        self._socket_io_lock = threading.Lock()
+
+        self._listener_thread = None
+        self._writer_thread = None
+
+        self._recv_queue = queue.Queue()
+        self._send_queue = queue.Queue()
+
     @property
     def type(self) -> Optional[str]:
         """Get SocketType object for this VPN.
@@ -64,7 +78,6 @@ class OpenVPNManagementInterface(object):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                self._socket.settimeout(5)
                 self._socket.connect(
                     ("{}".format(self._mgmt_host), int(self._mgmt_port))
                 )
@@ -72,10 +85,11 @@ class OpenVPNManagementInterface(object):
                 self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self._socket.connect(self._mgmt_socket)
 
-            resp = self._socket_recv()
+            resp = self._socket.recv(1024).decode("utf-8")
 
             if resp.startswith("ENTER PASSWORD"):
-                resp = self.send_command(self._mgmt_password)
+                self._socket.send((self._mgmt_password + "\n").encode("utf-8"))
+                resp = self._socket.recv(1024).decode("utf-8")
                 if not resp.startswith("SUCCESS: password is correct"):
                     logger.critical("Wrong management interface password.")
 
@@ -83,13 +97,23 @@ class OpenVPNManagementInterface(object):
                     "SUCCESS: password is correct"
                 ), "Wrong management interface password."
             else:
-                print(resp)
                 assert resp.startswith(
                     ">INFO"
                 ), "Did not get expected response from interface when opening socket."
 
-            logger.info("Connection to OpenVPN management interfaced established.")
+            self._socket_file = self._socket.makefile("r")
+            self._listener_thread = threading.Thread(
+                target=self._socket_listener_thread, daemon=True, name="mgmt-listener"
+            )
+            self._writer_thread = threading.Thread(
+                target=self._socket_writer_thread, daemon=True, name="mgmt-writer"
+            )
+
+            self._listener_thread.start()
+            self._writer_thread.start()
+
             self._get_version()
+            logger.info("Connection to OpenVPN management interfaced established.")
 
             return True
         except (socket.timeout, socket.error) as e:
@@ -128,24 +152,62 @@ class OpenVPNManagementInterface(object):
         finally:
             self.disconnect()
 
+    def _socket_listener_thread(self):
+        """This thread handles the socket's output and handles any events before adding the output to the receive queue.
+        """
+        recv_lines = []
+        while True:
+            if not self.is_connected:
+                break
+
+            line = self._socket_file.readline().strip()
+            if not line:
+                break
+
+            if line.startswith("SUCCESS:") or line.startswith("ERROR:"):
+                self._recv_queue.put(line + "\n")
+                continue
+
+            if len(recv_lines) == 0:
+                self._socket_io_lock.acquire()
+
+            recv_lines.append(line)
+
+            if LAST_LINE_REGEX.match(line):
+                self._socket_io_lock.release()
+                self._recv_queue.put("\n".join(recv_lines))
+                recv_lines = []
+
+    def _socket_writer_thread(self):
+        while True:
+            if not self.is_connected:
+                break
+
+            try:
+                data = self._send_queue.get()
+                self._socket_io_lock.acquire()
+                self._socket.send(bytes(data, "utf-8"))
+            finally:
+                self._socket_io_lock.release()
+
     def _socket_send(self, data) -> None:
         """Convert data to bytes and send to socket.
         """
-        self._socket.send(bytes(data, "utf-8"))
+        if self._socket is None:
+            raise errors.NotConnectedError(
+                "You must be connected to the management interface to issue commands."
+            )
+        self._send_queue.put(data)
 
     def _socket_recv(self) -> str:
         """Receive bytes from socket and convert to string.
         """
-        buffer_size = 4096  # 4 KiB
-        data = b""
-        while True:
-            part = self._socket.recv(buffer_size)
-            data += part
-            if len(part) < buffer_size:
-                # either 0 or end of data
-                break
+        if self._socket is None:
+            raise errors.NotConnectedError(
+                "You must be connected to the management interface to issue commands."
+            )
 
-        return data.decode("utf-8")
+        return self._recv_queue.get()
 
     def send_command(self, cmd) -> Optional[str]:
         """Send command to management interface and fetch response.
@@ -173,7 +235,7 @@ class OpenVPNManagementInterface(object):
             "Unable to get OpenVPN version, no matches found in socket response."
         )
 
-    def wait_for_data(self) -> str:
+    def receive(self) -> str:
         """Poll for incoming data
         """
         if not self.is_connected:
@@ -181,8 +243,6 @@ class OpenVPNManagementInterface(object):
                 "You must be connected to the management interface to issue commands."
             )
         logger.debug("Waiting for incoming data")
-
-        _ = select.select([self._socket], [], [])[0]
 
         return self._socket_recv()
 

@@ -5,7 +5,8 @@ import os
 
 import configargparse
 import msal
-from prometheus_client import Info, start_http_server
+from concurrent_log_handler.queue import setup_logging_queues
+from prometheus_client import Info, start_http_server, multiprocess
 
 from openvpn_auth_azure_ad._version import __version__
 from openvpn_auth_azure_ad.authenticator import AADAuthenticator, AADAuthenticatorFlows
@@ -31,17 +32,33 @@ parser.add_argument(
     version="%(prog)s {version}".format(version=__version__),
 )
 parser.add_argument(
+    "-t",
+    "--threads",
+    default=10,
+    env_var="AAD_THREAD_COUNT",
+    help="Amount of threads to handle authentication",
+    type=int,
+)
+
+parser_authentication = parser.add_argument_group("OpenVPN User Authentication")
+parser_authentication.add_argument(
     "-a",
     "--authenticators",
     default=AADAuthenticatorFlows.DEVICE_TOKEN,
     help="Enable authenticators. Multiple authenticators can be separated with comma",
     env_var="AAD_AUTHENTICATORS",
 )
-parser.add_argument(
+parser_authentication.add_argument(
     "--auth-token",
     action="store_true",
     help="Use auth token to re-authenticate clients",
     env_var="AAD_AUTH_TOKEN",
+)
+parser_authentication.add_argument(
+    "--verify-common-name",
+    action="store_true",
+    help="Check if common_name matches Azure AD UPN",
+    env_var="AAD_VERIFY_COMMON_NAME",
 )
 
 parser_openvpn = parser.add_argument_group("OpenVPN Management Interface settings")
@@ -126,6 +143,9 @@ parser_prometheus.add_argument(
 
 options = parser.parse_args()
 
+# convert all configured loggers to use a background thread
+setup_logging_queues()
+
 logging.basicConfig(
     level=options.log_level, format="%(asctime)s %(levelname)s %(message)s"
 )
@@ -141,7 +161,9 @@ authenticator = AADAuthenticator(
     app,
     options.graph_endpoint,
     options.authenticators,
+    options.verify_common_name,
     options.auth_token,
+    options.threads,
     options.ovpn_host,
     options.ovpn_port,
     options.ovpn_socket,
