@@ -12,6 +12,7 @@ from openvpn_auth_azure_ad import util
 from openvpn_auth_azure_ad._version import __version__
 from openvpn_auth_azure_ad.openvpn import OpenVPNManagementInterface
 from openvpn_auth_azure_ad.util import errors
+from openvpn_auth_azure_ad.util.thread_pool import ThreadPoolExecutorStackTraced
 
 openvpn_auth_azure_ad_events = Counter(
     "openvpn_auth_azure_ad_events", "track events", ["event"]
@@ -43,11 +44,13 @@ class AADAuthenticator(object):
         app: PublicClientApplication,
         graph_endpoint: str,
         authenticators: str,
+        verify_common_name: bool,
         auth_token: bool,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        socket: Optional[str] = None,
-        password: Optional[str] = None,
+        threads: int,
+        host: str = None,
+        port: int = None,
+        socket: str = None,
+        password: str = None,
     ):
         self._app = app
         self._graph_endpoint = graph_endpoint
@@ -62,30 +65,31 @@ class AADAuthenticator(object):
             }
         )
 
+        self._verify_common_name_enabled = verify_common_name
         self._auth_token_enabled = auth_token
+        self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
         logger.info("Running openvpn-auth-azure-ad %s" % __version__)
         try:
             while True:
-                data = self._openvpn.wait_for_data()
-                messages = data.split(">CLIENT:ENV,END")
+                message = self._openvpn.receive()
+                if message.startswith(">INFO"):
+                    continue
 
-                for message in messages:
-                    if message.startswith(">INFO"):
-                        continue
+                if message.startswith(">CLIENT:DISCONNECT"):
+                    self._thread_pool.submit(self.client_disconnect, message)
 
-                    if message.startswith(">CLIENT:DISCONNECT"):
-                        self.client_disconnect(message)
+                elif message.startswith(">CLIENT:CONNECT"):
+                    self._thread_pool.submit(self.client_connect, message)
 
-                    elif message.startswith(">CLIENT:CONNECT"):
-                        self.client_connect(message)
-
-                    elif message.startswith(">CLIENT:REAUTH"):
-                        self.client_reauth(message)
+                elif message.startswith(">CLIENT:REAUTH"):
+                    self._thread_pool.submit(self.client_reauth, message)
 
                 self._states["challenge"].delete_expired()
                 self._states["auth_token"].delete_expired()
+        except KeyboardInterrupt:
+            pass
         except Exception as e:
             logger.error(str(e), exc_info=e)
 
@@ -113,12 +117,11 @@ class AADAuthenticator(object):
         )
 
     def send_authentication_error(
-        self, client: Dict, message: str, client_message: Optional[str]
+        self, client: dict, message: str, client_message: Optional[str]
     ) -> None:
         if client_message is None:
             self._openvpn.send_command(
-                'client-deny %s %s "%s" "%s"'
-                % (client["cid"], client["kid"], message, message)
+                'client-deny %s %s "%s"' % (client["cid"], client["kid"], message)
             )
         else:
             client_challenge = util.format_client_challenge(client, client_message)
@@ -126,6 +129,19 @@ class AADAuthenticator(object):
                 'client-deny %s %s "%s" "%s"'
                 % (client["cid"], client["kid"], message, client_challenge)
             )
+
+    def verify_common_name(self, client, result) -> bool:
+        if (
+            "common_name" not in client["env"]
+            or "id_token_claims" not in result
+            or "preferred_username" not in result["id_token_claims"]
+        ):
+            return False
+
+        return (
+            client["env"]["common_name"]
+            == result["id_token_claims"]["preferred_username"]
+        )
 
     def handle_reauth(self, client: Dict) -> Optional[dict]:
         if not self._auth_token_enabled:
@@ -142,6 +158,9 @@ class AADAuthenticator(object):
         state_id = self._states["auth_token"].get(auth_token)
         if state_id is None:
             return None
+
+        # Inject state_id into client
+        client["state_id"] = state_id
 
         # Delete auth-token from auth-token state
         self._states["auth_token"].delete(auth_token)
@@ -217,11 +236,25 @@ class AADAuthenticator(object):
         self.authenticate_client(client)
 
     def authenticate_client(self, client: dict) -> None:
+        result = {}
+
         if client["reason"] == "reauth":
             # allow clients to bypass azure ad authentication by reauthenticate via auth-token
             result = self.handle_reauth(client)
             if result is not None:
                 if util.is_authenticated(result):
+                    if (
+                        self._verify_common_name_enabled
+                        and not self.verify_common_name(client, result)
+                    ):
+                        self.log_info(
+                            client, "common_name does not match Azure AD username."
+                        )
+                        self.send_authentication_error(
+                            client, "common_name_not_matched", None
+                        )
+                        return None
+
                     openvpn_auth_azure_ad_auth_succeeded.labels(
                         AADAuthenticatorFlows.AUTH_TOKEN
                     ).inc()
@@ -233,8 +266,19 @@ class AADAuthenticator(object):
             result = self.handle_response_challenge(client)
             if result is not None:
                 client["state_id"] = util.get_state_id(client)
-
                 if util.is_authenticated(result):
+                    if (
+                        self._verify_common_name_enabled
+                        and not self.verify_common_name(client, result)
+                    ):
+                        self.log_info(
+                            client, "common_name does not match Azure AD username."
+                        )
+                        self.send_authentication_error(
+                            client, "common_name_not_matched", None
+                        )
+                        return None
+
                     self._states["authenticated"].set(
                         client["state_id"], {"client": client, "result": result}
                     )
@@ -275,7 +319,18 @@ class AADAuthenticator(object):
                 scopes=self.token_scopes,
             )
 
-            if not util.is_authenticated(result):
+            if util.is_authenticated(result):
+                if self._verify_common_name_enabled and not self.verify_common_name(
+                    client, result
+                ):
+                    self.log_info(
+                        client, "common_name does not match Azure AD username."
+                    )
+                    self.send_authentication_error(
+                        client, "common_name_not_matched", None
+                    )
+                    return None
+            else:
                 openvpn_auth_azure_ad_auth_failures.labels(
                     AADAuthenticatorFlows.USER_PASSWORD
                 ).inc()
@@ -313,6 +368,9 @@ class AADAuthenticator(object):
             self.send_authentication_challenge(client, message)
             return
 
+        self._states["authenticated"].set(
+            client["state_id"], {"client": client, "result": result}
+        )
         self.send_authentication_success(client)
         return
 

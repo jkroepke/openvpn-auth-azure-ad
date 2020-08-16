@@ -34,7 +34,7 @@ setuptools.setup(
         "Environment :: Console",
         "Topic :: System :: Systems Administration :: Authentication/Directory",
     ],
-    install_requires=["msal", "cacheout", "ConfigArgParse", "prometheus_client"],
+    install_requires=["msal", "cacheout", "ConfigArgParse", "prometheus_client", "concurrent-log-handler"],
     project_urls={
         "Source": "https://github.com/jkroepke/openvpn-auth-azure-ad",
         "Bug Reports": "https://github.com/jkroepke/openvpn-auth-azure-ad/issues",
