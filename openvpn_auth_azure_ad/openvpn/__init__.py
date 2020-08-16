@@ -15,10 +15,21 @@ class SocketType:
 
 
 class OpenVPNManagementInterface(object):
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None,
-                 socket_path: Optional[str] = None, password: Optional[str] = None):
-        if (socket_path and host) or (socket_path and port) or (not socket_path and not host and not port):
-            raise errors.AuthenticatorError("Must specify either socket or host and port")
+    def __init__(
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        socket_path: Optional[str] = None,
+        password: Optional[str] = None,
+    ):
+        if (
+            (socket_path and host)
+            or (socket_path and port)
+            or (not socket_path and not host and not port)
+        ):
+            raise errors.AuthenticatorError(
+                "Must specify either socket or host and port"
+            )
         if socket_path:
             self._mgmt_socket = socket_path
             self._type = SocketType.UNIX_SOCKET
@@ -54,7 +65,9 @@ class OpenVPNManagementInterface(object):
                 self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 self._socket.settimeout(5)
-                self._socket.connect(('{}'.format(self._mgmt_host), int(self._mgmt_port)))
+                self._socket.connect(
+                    ("{}".format(self._mgmt_host), int(self._mgmt_port))
+                )
             else:
                 self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self._socket.connect(self._mgmt_socket)
@@ -66,10 +79,14 @@ class OpenVPNManagementInterface(object):
                 if not resp.startswith("SUCCESS: password is correct"):
                     logger.critical("Wrong management interface password.")
 
-                assert resp.startswith("SUCCESS: password is correct"), "Wrong management interface password."
+                assert resp.startswith(
+                    "SUCCESS: password is correct"
+                ), "Wrong management interface password."
             else:
                 print(resp)
-                assert resp.startswith(">INFO"), "Did not get expected response from interface when opening socket."
+                assert resp.startswith(
+                    ">INFO"
+                ), "Did not get expected response from interface when opening socket."
 
             logger.info("Connection to OpenVPN management interfaced established.")
             self._get_version()
@@ -120,7 +137,7 @@ class OpenVPNManagementInterface(object):
         """Receive bytes from socket and convert to string.
         """
         buffer_size = 4096  # 4 KiB
-        data = b''
+        data = b""
         while True:
             part = self._socket.recv(buffer_size)
             data += part
@@ -134,7 +151,9 @@ class OpenVPNManagementInterface(object):
         """Send command to management interface and fetch response.
         """
         if not self.is_connected:
-            raise errors.NotConnectedError("You must be connected to the management interface to issue commands.")
+            raise errors.NotConnectedError(
+                "You must be connected to the management interface to issue commands."
+            )
         logger.debug("Sending cmd: %r", cmd.strip())
         self._socket_send(cmd + "\n")
         if cmd.startswith("kill") or cmd.startswith("client-kill"):
@@ -150,13 +169,17 @@ class OpenVPNManagementInterface(object):
         for line in raw.splitlines():
             if line.startswith("OpenVPN Version"):
                 return line.replace("OpenVPN Version: ", "")
-        raise errors.ParseError("Unable to get OpenVPN version, no matches found in socket response.")
+        raise errors.ParseError(
+            "Unable to get OpenVPN version, no matches found in socket response."
+        )
 
     def wait_for_data(self) -> str:
         """Poll for incoming data
         """
         if not self.is_connected:
-            raise errors.NotConnectedError("You must be connected to the management interface to issue commands.")
+            raise errors.NotConnectedError(
+                "You must be connected to the management interface to issue commands."
+            )
         logger.debug("Waiting for incoming data")
 
         _ = select.select([self._socket], [], [])[0]
@@ -165,7 +188,11 @@ class OpenVPNManagementInterface(object):
 
     @staticmethod
     def has_prefix(line) -> bool:
-        return line.startswith(">INFO") or line.startswith(">CLIENT") or line.startswith(">STATE")
+        return (
+            line.startswith(">INFO")
+            or line.startswith(">CLIENT")
+            or line.startswith(">STATE")
+        )
 
     @property
     def socket(self):

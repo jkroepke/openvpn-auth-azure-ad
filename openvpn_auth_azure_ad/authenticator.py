@@ -131,9 +131,7 @@ class AADAuthenticator(object):
         if not self._auth_token_enabled:
             return None
 
-        openvpn_auth_azure_ad_auth_total.labels(
-            AADAuthenticatorFlows.AUTH_TOKEN
-        ).inc()
+        openvpn_auth_azure_ad_auth_total.labels(AADAuthenticatorFlows.AUTH_TOKEN).inc()
 
         # Get Auth-Token from Request
         auth_token = util.get_auth_token(client)
