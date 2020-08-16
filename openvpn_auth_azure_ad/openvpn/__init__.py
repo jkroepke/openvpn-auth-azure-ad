@@ -4,6 +4,7 @@ import queue
 import re
 import socket
 import threading
+import time
 from typing import Generator, Optional
 
 import openvpn_auth_azure_ad.util.errors as errors
@@ -70,54 +71,64 @@ class OpenVPNManagementInterface(object):
         else:
             return str(self._mgmt_socket)
 
-    def connect(self) -> Optional[bool]:
+    def connect(self, retry: bool = False) -> Optional[bool]:
         """Connect to management interface socket.
         """
-        try:
-            if self.type == SocketType.IP:
-                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                self._socket.connect(
-                    ("{}".format(self._mgmt_host), int(self._mgmt_port))
-                )
-            else:
-                self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                self._socket.connect(self._mgmt_socket)
+        while True:
+            try:
+                if self.type == SocketType.IP:
+                    self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                    self._socket.connect(
+                        ("{}".format(self._mgmt_host), int(self._mgmt_port))
+                    )
+                else:
+                    self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    self._socket.connect(self._mgmt_socket)
 
-            resp = self._socket.recv(1024).decode("utf-8")
-
-            if resp.startswith("ENTER PASSWORD"):
-                self._socket.send((self._mgmt_password + "\n").encode("utf-8"))
                 resp = self._socket.recv(1024).decode("utf-8")
-                if not resp.startswith("SUCCESS: password is correct"):
-                    logger.critical("Wrong management interface password.")
 
-                assert resp.startswith(
-                    "SUCCESS: password is correct"
-                ), "Wrong management interface password."
-            else:
-                assert resp.startswith(
-                    ">INFO"
-                ), "Did not get expected response from interface when opening socket."
+                if resp.startswith("ENTER PASSWORD"):
+                    self._socket.send((self._mgmt_password + "\n").encode("utf-8"))
+                    resp = self._socket.recv(1024).decode("utf-8")
+                    if not resp.startswith("SUCCESS: password is correct"):
+                        logger.critical("Wrong management interface password.")
 
-            self._socket_file = self._socket.makefile("r")
-            self._listener_thread = threading.Thread(
-                target=self._socket_listener_thread, daemon=True, name="mgmt-listener"
-            )
-            self._writer_thread = threading.Thread(
-                target=self._socket_writer_thread, daemon=True, name="mgmt-writer"
-            )
+                    assert resp.startswith(
+                        "SUCCESS: password is correct"
+                    ), "Wrong management interface password."
+                else:
+                    assert resp.startswith(
+                        ">INFO"
+                    ), "Did not get expected response from interface when opening socket."
 
-            self._listener_thread.start()
-            self._writer_thread.start()
+                self._socket_file = self._socket.makefile("r")
+                self._listener_thread = threading.Thread(
+                    target=self._socket_listener_thread,
+                    daemon=True,
+                    name="mgmt-listener",
+                )
+                self._writer_thread = threading.Thread(
+                    target=self._socket_writer_thread, daemon=True, name="mgmt-writer"
+                )
 
-            self._get_version()
-            logger.info("Connection to OpenVPN management interfaced established.")
+                self._listener_thread.start()
+                self._writer_thread.start()
 
-            return True
-        except (socket.timeout, socket.error) as e:
-            raise errors.ConnectError(str(e)) from None
+                self._get_version()
+                logger.info("Connection to OpenVPN management interfaced established.")
+
+                return True
+            except AssertionError as e:
+                if not retry:
+                    raise e
+            except (socket.timeout, socket.error) as e:
+                if retry:
+                    logger.error(str(e))
+                    time.sleep(1)
+                else:
+                    raise errors.ConnectError(str(e)) from None
 
     def disconnect(self, _quit=True) -> None:
         """Disconnect from management interface socket.

@@ -75,8 +75,9 @@ class AADAuthenticator(object):
             while True:
                 message = self._openvpn.receive()
                 if not message:
-                    logger.error("Connection to OpenVPN closed.")
-                    break
+                    logger.error("Connection to OpenVPN closed. Reconnecting...")
+                    self._openvpn.connect(True)
+                    continue
 
                 if message.startswith(">INFO"):
                     continue
