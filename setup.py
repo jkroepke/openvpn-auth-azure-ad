@@ -42,6 +42,8 @@ setuptools.setup(
         "concurrent-log-handler",
     ],
     project_urls={
+        "Changelog": "https://github.com/jkroepke/openvpn-auth-azure-ad/blob/v%s/CHANGELOG.md"
+        % __version__,
         "Source": "https://github.com/jkroepke/openvpn-auth-azure-ad",
         "Bug Reports": "https://github.com/jkroepke/openvpn-auth-azure-ad/issues",
     },
