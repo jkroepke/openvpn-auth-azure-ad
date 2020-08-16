@@ -13,15 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-## [1.1.0] - 2020-08-16
+## [1.1.1] - 2020-08-16
 
 ### Added
-* Multi-Thread support
-* Terminate program if connection to OpenVPN closed.
+
+- Update documentation
 
 ### Changed
 
 ### Removed
+
+## [1.1.0] - 2020-08-16
+
+### Added
+
+- Multi-Thread support
+- Terminate program if connection to OpenVPN closed.
 
 ## [1.0.1] - 2020-08-16
 

@@ -77,10 +77,10 @@ specified via -c). Config file syntax allows: key=value, flag=true, stuff=[a,b,c
 specified in more than one place, then commandline values override environment variables which override config file values which override defaults.
 
 ```
-usage: openvpn-auth-azure-ad [-h] [-c CONFIG] [-V] [-a AUTHENTICATORS] [--auth-token] [-H OVPN_HOST] [-P OVPN_PORT] [-s OVPN_SOCKET]
-                             [-p OVPN_PASSWORD] --client-id CLIENT_ID [--token-authority TOKEN_AUTHORITY] [--graph-endpoint GRAPH_ENDPOINT]
-                             [--prometheus] [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR] [--prometheus-listen-port PROMETHEUS_LISTEN_PORT]
-                             [--log-level LOG_LEVEL]
+usage: openvpn-auth-azure-ad [-h] [-c CONFIG] [-V] [-t THREADS] [-a AUTHENTICATORS] [--auth-token] [--verify-common-name] [-H OVPN_HOST]
+                             [-P OVPN_PORT] [-s OVPN_SOCKET] [-p OVPN_PASSWORD] --client-id CLIENT_ID [--token-authority TOKEN_AUTHORITY]
+                             [--graph-endpoint GRAPH_ENDPOINT] [--prometheus] [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR]
+                             [--prometheus-listen-port PROMETHEUS_LISTEN_PORT] [--log-level LOG_LEVEL]
 
 Args that start with '--' (eg. -V) can also be set in a config file (/etc/openvpn-auth-azure-ad/config.conf or ~/.openvpn-auth-azure-ad or specified
 via -c). Config file syntax allows: key=value, flag=true, stuff=[a,b,c] (for details, see syntax at https://goo.gl/R74nmi). If an arg is specified in
@@ -91,9 +91,14 @@ optional arguments:
   -c CONFIG, --config CONFIG
                         path of config file [env var: AAD_CONFIG_PATH]
   -V, --version         show program's version number and exit
+  -t THREADS, --threads THREADS
+                        Amount of threads to handle authentication [env var: AAD_THREAD_COUNT]
+
+OpenVPN User Authentication:
   -a AUTHENTICATORS, --authenticators AUTHENTICATORS
                         Enable authenticators. Multiple authenticators can be separated with comma [env var: AAD_AUTHENTICATORS]
   --auth-token          Use auth token to re-authenticate clients [env var: AAD_AUTH_TOKEN]
+  --verify-common-name  Check if common_name matches Azure AD UPN [env var: AAD_VERIFY_COMMON_NAME]
 
 OpenVPN Management Interface settings:
   -H OVPN_HOST, --ovpn-host OVPN_HOST
@@ -122,8 +127,22 @@ Prometheus settings:
                         prometheus statistics [env var: AAD_PROMETHEUS_PORT]
   --log-level LOG_LEVEL
                         Configure the logging level. [env var: AAD_LOG_LEVEL]
-
 ```
+
+## Register an app with AAD
+
+See: https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app
+
+#### TL;DR
+
+1. Login as admin into tenant
+2. Open [App registrations](https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps) in Azure AD admin center
+3. Click new registration
+4. Pick a name, chose a "Supported account types"-option. Let the redirect uri blank and click register.
+5. Copy the client-id. You need the client-id as configuration option for `openvpn-auth-azure-ad`.
+6. Click on Authentication on the left menu
+7. "Add a platform", pick Mobile and desktop applications and chose the "MSAL only" option.
+8. On Advanced settings, set "Treat application as a public client" to yes.
 
 ## Required settings on OpenVPN configuration files
 
@@ -146,17 +165,17 @@ auth-retry interact
 
 `auth-user-pass` is always required otherwise dynamic challenges will not work.
 
-## Prometheus support
+# Prometheus support
 
 openvpn-auth-azure-ad has some built-in prometheus support to collect some statistics about authenticators. By default,
 the prometheus endpoint listen on port 9723.
 
-## Related projects
+# Related projects
 
 - https://github.com/CyberNinjas/openvpn-auth-aad
 - https://github.com/stilljake/openvpn-azure-ad-auth
 
-## Copyright and license
+# Copyright and license
 
 © [2020 Jan-Otto Kröpke (jkroepke)](https://github.com/jkroepke/helm-secrets)
 
