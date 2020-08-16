@@ -4,11 +4,11 @@ After=openvpn.service
 Wants=openvpn.service
 PartOf=openvpn.service
 ReloadPropagatedFrom=openvpn.service
-Documentation=https://github.com/jkroepke/openvpn_aad_authenticator
+Documentation=https://github.com/jkroepke/openvpn-auth-azure-ad
 
 [Service]
 PrivateTmp=true
-ExecStart=/usr/bin/openvpn_aad_authenticator
+ExecStart=/usr/local/bin/openvpn-auth-azure-ad
 ProtectSystem=true
 ProtectHome=true
 

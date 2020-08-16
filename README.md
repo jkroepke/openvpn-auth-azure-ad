@@ -6,8 +6,8 @@
 
 # openvpn-auth-azure-ad
 
-openvpn-auth-azure-ad is an external service that
-connects to the openvpn management interface and handle the authentication against Azure AD.
+openvpn-auth-azure-ad is an external service connects to the openvpn management interface and handle the authentication
+of connecting users against Azure AD.
 
 OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
@@ -29,22 +29,32 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 Currently, openvpn-auth-azure-ad supports 2 authentication method against Azure AD:
 
-- [Device token code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
+- [device authorization grant flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
 - [Resource Owner Password Credentials grant](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc)
   (not recommend, see docs for limitations)
 
 Additionally, if enabled openvpn-auth-azure-ad supports OpenVPNs `auth-token` mechanismus to allow users to bypass
 then authenticator above on re-authentications, e.g. due `reneg-sec`.
 
+`auth-gen-token` must not set on the config.
+
 # Installation
 
-## via python-pip
+## via pip
 
 ```
 # pip install openvpn-auth-azure-ad
 ```
 
 For install pip on your system, see [pip docs](https://pip.pypa.io/en/stable/installing/).
+
+To run a persistent daemon, you copy the [systemd unit file](./contrib/openvpn-auth-azure-ad.service) to `/etc/systemd/system`, then
+run
+
+```bash
+# systemctl enable openvpn-auth-azure-ad
+# systemctl start openvpn-auth-azure-ad
+```
 
 ## via docker
 
@@ -134,12 +144,11 @@ auth-user-pass
 auth-retry interact
 ```
 
-`auth-user-pass` is required even if the `username_password` authenticator is disabled. Otherwise the dynamic challenges
-will not work.
+`auth-user-pass` is always required otherwise dynamic challenges will not work.
 
 ## Prometheus support
 
-openvpn-auth-azure-ad has some built-in prometheus support to collect some statistics about authenticators. By default
+openvpn-auth-azure-ad has some built-in prometheus support to collect some statistics about authenticators. By default,
 the prometheus endpoint listen on port 9723.
 
 ## Related projects
