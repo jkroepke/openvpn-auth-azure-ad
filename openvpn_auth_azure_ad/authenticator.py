@@ -1,7 +1,6 @@
 import json
 import logging
 import time
-import uuid
 from typing import Dict, Optional
 
 from cacheout import CacheManager
@@ -46,6 +45,7 @@ class AADAuthenticator(object):
         authenticators: str,
         verify_common_name: bool,
         auth_token: bool,
+        auth_token_lifetime: int,
         threads: int,
         host: str = None,
         port: int = None,
@@ -67,6 +67,7 @@ class AADAuthenticator(object):
 
         self._verify_common_name_enabled = verify_common_name
         self._auth_token_enabled = auth_token
+        self._auth_token_lifetime = auth_token_lifetime
         self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
@@ -79,7 +80,8 @@ class AADAuthenticator(object):
                     self._openvpn.connect(True)
                     continue
 
-                if message.startswith(">INFO"):
+                if message.startswith("ERROR:"):
+                    logger.error(message)
                     continue
 
                 if message.startswith(">CLIENT:DISCONNECT"):
@@ -100,12 +102,10 @@ class AADAuthenticator(object):
 
     def send_authentication_success(self, client: dict) -> None:
         self.log_info(client, "authentication succeeded")
-        if self._auth_token_enabled:
-            auth_token = str(uuid.uuid1())
-            self._states["auth_token"].set(auth_token, client["state_id"])
+        if client["auth_token"] is not None:
             self._openvpn.send_command(
                 'client-auth %s %s\npush "auth-token %s"\nEND'
-                % (client["cid"], client["kid"], auth_token)
+                % (client["cid"], client["kid"], client["auth_token"])
             )
         else:
             self._openvpn.send_command(
@@ -135,6 +135,13 @@ class AADAuthenticator(object):
                 % (client["cid"], client["kid"], message, client_challenge)
             )
 
+    def setup_auth_token(self, client) -> None:
+        if self._auth_token_enabled:
+            client["auth_token"] = util.generated_id()
+            self._states["auth_token"].set(
+                client["auth_token"], client["state_id"], self._auth_token_lifetime
+            )
+
     def verify_common_name(self, client, result) -> bool:
         if (
             "common_name" not in client["env"]
@@ -155,23 +162,17 @@ class AADAuthenticator(object):
         openvpn_auth_azure_ad_auth_total.labels(AADAuthenticatorFlows.AUTH_TOKEN).inc()
 
         # Get Auth-Token from Request
-        auth_token = util.get_auth_token(client)
-        if auth_token is None:
+        client["auth_token"] = util.get_auth_token(client)
+        if client["auth_token"] is None:
             return None
 
         # Receive state_id by auth-token
-        state_id = self._states["auth_token"].get(auth_token)
-        if state_id is None:
+        client["state_id"] = self._states["auth_token"].get(client["auth_token"])
+        if client["state_id"] is None:
             return None
 
-        # Inject state_id into client
-        client["state_id"] = state_id
-
-        # Delete auth-token from auth-token state
-        self._states["auth_token"].delete(auth_token)
-
         # Get authenticated state
-        authenticated_state = self._states["authenticated"].get(state_id)
+        authenticated_state = self._states["authenticated"].get(client["state_id"])
         if authenticated_state is None:
             return None
 
@@ -183,7 +184,8 @@ class AADAuthenticator(object):
 
         # recheck if connected client is the same as inside the state.
         if (
-            client["env"]["common_name"]
+            client["auth_token"] != authenticated_state["client"]["auth_token"]
+            or client["env"]["common_name"]
             != authenticated_state["client"]["env"]["common_name"]
             or client["env"]["username"]
             != authenticated_state["client"]["env"]["username"]
@@ -284,6 +286,7 @@ class AADAuthenticator(object):
                         )
                         return None
 
+                    self.setup_auth_token(client)
                     self._states["authenticated"].set(
                         client["state_id"], {"client": client, "result": result}
                     )
@@ -312,7 +315,7 @@ class AADAuthenticator(object):
                         )
                     return
 
-        client["state_id"] = str(uuid.uuid1())
+        client["state_id"] = util.generated_id()
         if AADAuthenticatorFlows.USER_PASSWORD in self._authenticators:
             self.log_debug(client, "Authenticate using username/password flow")
             openvpn_auth_azure_ad_auth_total.labels(
@@ -373,6 +376,7 @@ class AADAuthenticator(object):
             self.send_authentication_challenge(client, message)
             return
 
+        self.setup_auth_token(client)
         self._states["authenticated"].set(
             client["state_id"], {"client": client, "result": result}
         )

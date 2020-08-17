@@ -55,6 +55,13 @@ parser_authentication.add_argument(
     env_var="AAD_AUTH_TOKEN",
 )
 parser_authentication.add_argument(
+    "--auth-token-livetime",
+    type=int,
+    default=86400,
+    help="Livetime of auth tokens in seconds",
+    env_var="AAD_AUTH_TOKEN_LIFETIME",
+)
+parser_authentication.add_argument(
     "--verify-common-name",
     action="store_true",
     help="Check if common_name matches Azure AD UPN",
@@ -163,6 +170,7 @@ authenticator = AADAuthenticator(
     options.authenticators,
     options.verify_common_name,
     options.auth_token,
+    options.auth_token_livetime,
     options.threads,
     options.ovpn_host,
     options.ovpn_port,

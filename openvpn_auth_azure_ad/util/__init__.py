@@ -1,4 +1,6 @@
 import base64
+import uuid
+
 from typing import Optional
 
 
@@ -8,6 +10,10 @@ def b64encode_string(s: str) -> str:
 
 def is_authenticated(result: dict) -> bool:
     return "access_token" in result
+
+
+def generated_id() -> str:
+    return str(uuid.uuid4())
 
 
 def format_error(result: dict) -> str:

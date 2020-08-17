@@ -53,7 +53,11 @@ class OpenVPNManagementInterface(object):
         self._listener_thread = None
         self._writer_thread = None
 
-        self._recv_queue = queue.Queue()
+        self._recv_queue = {
+            "COMMAND": queue.Queue(),
+            "CLIENT": queue.Queue(),
+            "INFO": queue.Queue(),
+        }
         self._send_queue = queue.Queue()
 
     @property
@@ -89,20 +93,6 @@ class OpenVPNManagementInterface(object):
 
                 resp = self._socket.recv(1024).decode("utf-8")
 
-                if resp.startswith("ENTER PASSWORD"):
-                    self._socket.send((self._mgmt_password + "\n").encode("utf-8"))
-                    resp = self._socket.recv(1024).decode("utf-8")
-                    if not resp.startswith("SUCCESS: password is correct"):
-                        logger.critical("Wrong management interface password.")
-
-                    assert resp.startswith(
-                        "SUCCESS: password is correct"
-                    ), "Wrong management interface password."
-                else:
-                    assert resp.startswith(
-                        ">INFO"
-                    ), "Did not get expected response from interface when opening socket."
-
                 self._socket_file = self._socket.makefile("r")
                 self._listener_thread = threading.Thread(
                     target=self._socket_listener_thread,
@@ -115,6 +105,24 @@ class OpenVPNManagementInterface(object):
 
                 self._listener_thread.start()
                 self._writer_thread.start()
+
+                if resp.startswith("ENTER PASSWORD"):
+                    resp = self.send_command(self._mgmt_password)
+                    if not resp.startswith("SUCCESS: password is correct"):
+                        logger.critical("Wrong management interface password.")
+
+                    assert resp.startswith(
+                        "SUCCESS: password is correct"
+                    ), "Wrong management interface password."
+
+                    resp = self._socket_recv("INFO")
+                    assert resp.startswith(
+                        ">INFO"
+                    ), "Did not get expected response from interface when opening socket."
+                else:
+                    assert resp.startswith(
+                        ">INFO"
+                    ), "Did not get expected response from interface when opening socket."
 
                 self._get_version()
                 logger.info("Connection to OpenVPN management interfaced established.")
@@ -172,12 +180,21 @@ class OpenVPNManagementInterface(object):
                 break
 
             line = self._socket_file.readline().strip()
+
             if not line:
-                self._recv_queue.put(None)
+                self._recv_queue["CLIENT"].put(None)
                 break
 
-            if line.startswith("SUCCESS:") or line.startswith("ERROR:"):
-                self._recv_queue.put(line + "\n")
+            if line.startswith(">INFO:"):
+                self._recv_queue["INFO"].put(line + "\n")
+                continue
+
+            if (
+                line.startswith("SUCCESS:")
+                or line.startswith("ERROR:")
+                or line.startswith("ENTER PASSWORD")
+            ):
+                self._recv_queue["COMMAND"].put(line + "\n")
                 continue
 
             if len(recv_lines) == 0:
@@ -187,7 +204,8 @@ class OpenVPNManagementInterface(object):
 
             if LAST_LINE_REGEX.match(line):
                 self._socket_io_lock.release()
-                self._recv_queue.put("\n".join(recv_lines))
+                queue_name = "CLIENT" if line.startswith(">CLIENT") else "COMMAND"
+                self._recv_queue[queue_name].put("\n".join(recv_lines))
                 recv_lines = []
 
     def _socket_writer_thread(self):
@@ -211,7 +229,7 @@ class OpenVPNManagementInterface(object):
             )
         self._send_queue.put(data)
 
-    def _socket_recv(self) -> str:
+    def _socket_recv(self, queue_name: str) -> str:
         """Receive bytes from socket and convert to string.
         """
         if self._socket is None:
@@ -219,7 +237,7 @@ class OpenVPNManagementInterface(object):
                 "You must be connected to the management interface to issue commands."
             )
 
-        return self._recv_queue.get()
+        return self._recv_queue[queue_name].get()
 
     def send_command(self, cmd) -> Optional[str]:
         """Send command to management interface and fetch response.
@@ -232,7 +250,7 @@ class OpenVPNManagementInterface(object):
         self._socket_send(cmd + "\n")
         if cmd.startswith("kill") or cmd.startswith("client-kill"):
             return
-        resp = self._socket_recv()
+        resp = self._socket_recv("COMMAND")
         logger.debug("Cmd response: %r", resp)
         return resp
 
@@ -256,7 +274,7 @@ class OpenVPNManagementInterface(object):
             )
         logger.debug("Waiting for incoming data")
 
-        return self._socket_recv()
+        return self._socket_recv("CLIENT")
 
     @staticmethod
     def has_prefix(line) -> bool:
