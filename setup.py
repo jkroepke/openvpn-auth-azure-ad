@@ -13,7 +13,11 @@ with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
 setuptools.setup(
     name="openvpn-auth-azure-ad",
     version=__version__,
-    scripts=["openvpn_auth_azure_ad/openvpn-auth-azure-ad"],
+    entry_points={
+        'console_scripts': [
+            'openvpn-auth-azure-ad = openvpn_auth_azure_ad.cli:main',
+        ],
+    },
     license="MIT",
     author="Jan-Otto Kröpke",
     author_email="pip@jkroepke.de",
@@ -35,11 +39,11 @@ setuptools.setup(
         "Topic :: System :: Systems Administration :: Authentication/Directory",
     ],
     install_requires=[
-        "msal",
-        "cacheout",
-        "ConfigArgParse",
-        "prometheus_client",
-        "concurrent-log-handler",
+        "msal~=1.4",
+        "cacheout~=0.11",
+        "ConfigArgParse~=1.2",
+        "prometheus_client~=0.8",
+        "concurrent-log-handler~=0.9",
     ],
     project_urls={
         "Changelog": "https://github.com/jkroepke/openvpn-auth-azure-ad/blob/v%s/CHANGELOG.md"

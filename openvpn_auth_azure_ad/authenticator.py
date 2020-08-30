@@ -7,11 +7,10 @@ from cacheout import CacheManager
 from msal import PublicClientApplication
 from prometheus_client import Counter
 
-from openvpn_auth_azure_ad import util
-from openvpn_auth_azure_ad._version import __version__
-from openvpn_auth_azure_ad.openvpn import OpenVPNManagementInterface
-from openvpn_auth_azure_ad.util import errors
-from openvpn_auth_azure_ad.util.thread_pool import ThreadPoolExecutorStackTraced
+from . import util
+from .openvpn import OpenVPNManagementInterface
+from .util import errors
+from .util.thread_pool import ThreadPoolExecutorStackTraced
 
 openvpn_auth_azure_ad_events = Counter(
     "openvpn_auth_azure_ad_events", "track events", ["event"]
@@ -46,6 +45,7 @@ class AADAuthenticator(object):
         verify_common_name: bool,
         auth_token: bool,
         auth_token_lifetime: int,
+        remember_user: bool,
         threads: int,
         host: str = None,
         port: int = None,
@@ -68,6 +68,7 @@ class AADAuthenticator(object):
         self._verify_common_name_enabled = verify_common_name
         self._auth_token_enabled = auth_token
         self._auth_token_lifetime = auth_token_lifetime
+        self._remember_user_enabled = remember_user
         self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
@@ -316,6 +317,19 @@ class AADAuthenticator(object):
                     return
 
         client["state_id"] = util.generated_id()
+        if self._remember_user_enabled:
+            accounts = self._app.get_accounts()
+            if "common_name" not in client["env"] and accounts:
+                result = self._app.acquire_token_silent(self.token_scopes, account=client["env"]["common_name"])
+
+            if util.is_authenticated(result):
+                self.setup_auth_token(client)
+                self._states["authenticated"].set(
+                    client["state_id"], {"client": client, "result": result}
+                )
+                self.send_authentication_success(client)
+                return
+
         if AADAuthenticatorFlows.USER_PASSWORD in self._authenticators:
             self.log_debug(client, "Authenticate using username/password flow")
             openvpn_auth_azure_ad_auth_total.labels(

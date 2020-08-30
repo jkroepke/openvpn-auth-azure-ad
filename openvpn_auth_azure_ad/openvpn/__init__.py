@@ -6,8 +6,7 @@ import socket
 import threading
 import time
 from typing import Generator, Optional
-
-import openvpn_auth_azure_ad.util.errors as errors
+from ..util import errors
 
 logger = logging.getLogger(__name__)
 
