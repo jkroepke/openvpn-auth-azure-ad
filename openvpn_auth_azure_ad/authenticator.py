@@ -8,6 +8,7 @@ from msal import PublicClientApplication
 from prometheus_client import Counter
 
 from . import util
+from ._version import __version__
 from .openvpn import OpenVPNManagementInterface
 from .util import errors
 from .util.thread_pool import ThreadPoolExecutorStackTraced
