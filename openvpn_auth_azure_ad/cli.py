@@ -115,15 +115,15 @@ def main():
         ),
         env_var="AAD_TOKEN_AUTHORITY",
         help="A URL that identifies a token authority. It should be of the format "
-             "https://login.microsoftonline.com/your_tenant. By default, we will use "
-             "https://login.microsoftonline.com/organizations",
+        "https://login.microsoftonline.com/your_tenant. By default, we will use "
+        "https://login.microsoftonline.com/organizations",
     )
     parser_aad.add_argument(
         "--graph-endpoint",
         default="https://graph.microsoft.com/v1.0/",
         env_var="AAD_GRAPH_ENDPOINT",
         help="Endpoint of the graph API. See: "
-             "https://developer.microsoft.com/en-us/graph/graph-explorer",
+        "https://developer.microsoft.com/en-us/graph/graph-explorer",
     )
 
     parser_prometheus = parser.add_argument_group("Prometheus settings")
@@ -164,11 +164,15 @@ def main():
     )
 
     if options.prometheus:
-        start_http_server(options.prometheus_listen_port, options.prometheus_listen_addr)
+        start_http_server(
+            options.prometheus_listen_port, options.prometheus_listen_addr
+        )
         i = Info("openvpn_auth_azure_ad_version", "info of openvpn-auth-azure-ad")
         i.info({"version": __version__})
 
-    app = msal.PublicClientApplication(options.client_id, authority=options.token_authority)
+    app = msal.PublicClientApplication(
+        options.client_id, authority=options.token_authority
+    )
 
     authenticator = AADAuthenticator(
         app,
