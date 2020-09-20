@@ -43,7 +43,7 @@ class AADAuthenticator(object):
         app: PublicClientApplication,
         graph_endpoint: str,
         authenticators: str,
-        verify_common_name: bool,
+        verify_certificate_claim: str,
         auth_token: bool,
         auth_token_lifetime: int,
         remember_user: bool,
@@ -66,7 +66,7 @@ class AADAuthenticator(object):
             }
         )
 
-        self._verify_common_name_enabled = verify_common_name
+        self._verify_certificate_claim = verify_certificate_claim
         self._auth_token_enabled = auth_token
         self._auth_token_lifetime = auth_token_lifetime
         self._remember_user_enabled = remember_user
@@ -144,18 +144,22 @@ class AADAuthenticator(object):
                 client["auth_token"], client["state_id"], self._auth_token_lifetime
             )
 
-    def verify_common_name(self, client, result) -> bool:
-        if (
-            "common_name" not in client["env"]
-            or "id_token_claims" not in result
-            or "preferred_username" not in result["id_token_claims"]
-        ):
+    def verify_client_certificate(self, client, result) -> bool:
+        if self._verify_certificate_claim == "":
+            return True
+
+        if "common_name" not in client["env"]:
             return False
 
-        return (
-            client["env"]["common_name"]
-            == result["id_token_claims"]["preferred_username"]
-        )
+        if "id_token_claims" not in result:
+            self.log_warn(client, "Could not get id_token")
+            return False
+
+        if self._verify_certificate_claim not in result["id_token_claims"]:
+            self.log_warn(client, "claim %s does not exist in id_token" % (self._verify_certificate_claim,))
+            return False
+
+        return client["env"]["common_name"] == result["id_token_claims"][self._verify_certificate_claim]
 
     def handle_reauth(self, client: Dict) -> Optional[dict]:
         if not self._auth_token_enabled:
@@ -252,15 +256,12 @@ class AADAuthenticator(object):
             result = self.handle_reauth(client)
             if result is not None:
                 if util.is_authenticated(result):
-                    if (
-                        self._verify_common_name_enabled
-                        and not self.verify_common_name(client, result)
-                    ):
+                    if self.verify_client_certificate(client, result):
                         self.log_info(
-                            client, "common_name does not match Azure AD username."
+                            client, "client certificate does not match Azure AD user."
                         )
                         self.send_authentication_error(
-                            client, "common_name_not_matched", None
+                            client, "client_certificate_not_matched", None
                         )
                         return None
 
@@ -276,15 +277,12 @@ class AADAuthenticator(object):
             if result is not None:
                 client["state_id"] = util.get_state_id(client)
                 if util.is_authenticated(result):
-                    if (
-                        self._verify_common_name_enabled
-                        and not self.verify_common_name(client, result)
-                    ):
+                    if not self.verify_client_certificate(client, result):
                         self.log_info(
-                            client, "common_name does not match Azure AD username."
+                            client, "client certificate does not match Azure AD user."
                         )
                         self.send_authentication_error(
-                            client, "common_name_not_matched", None
+                            client, "client_certificate_not_matched", None
                         )
                         return None
 
@@ -345,14 +343,14 @@ class AADAuthenticator(object):
             )
 
             if util.is_authenticated(result):
-                if self._verify_common_name_enabled and not self.verify_common_name(
+                if not self.verify_client_certificate(
                     client, result
                 ):
                     self.log_info(
-                        client, "common_name does not match Azure AD username."
+                        client, "client certificate does not match Azure AD user."
                     )
                     self.send_authentication_error(
-                        client, "common_name_not_matched", None
+                        client, "client_certificate_not_matched", None
                     )
                     return None
             else:
@@ -451,6 +449,11 @@ class AADAuthenticator(object):
                 raise errors.ParseError("Can't parse line: %s" % (line,))
 
         return client
+
+    def log_warn(self, client: dict, message: str) -> None:
+        prefix = self.format_log_prefix(client)
+
+        logger.warning("[%s]: %s" % (prefix, message))
 
     def log_info(self, client: dict, message: str) -> None:
         prefix = self.format_log_prefix(client)
