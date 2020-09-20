@@ -156,10 +156,17 @@ class AADAuthenticator(object):
             return False
 
         if self._verify_certificate_claim not in result["id_token_claims"]:
-            self.log_warn(client, "claim %s does not exist in id_token" % (self._verify_certificate_claim,))
+            self.log_warn(
+                client,
+                "claim %s does not exist in id_token"
+                % (self._verify_certificate_claim,),
+            )
             return False
 
-        return client["env"]["common_name"] == result["id_token_claims"][self._verify_certificate_claim]
+        return (
+            client["env"]["common_name"]
+            == result["id_token_claims"][self._verify_certificate_claim]
+        )
 
     def handle_reauth(self, client: Dict) -> Optional[dict]:
         if not self._auth_token_enabled:
@@ -343,9 +350,7 @@ class AADAuthenticator(object):
             )
 
             if util.is_authenticated(result):
-                if not self.verify_client_certificate(
-                    client, result
-                ):
+                if not self.verify_client_certificate(client, result):
                     self.log_info(
                         client, "client certificate does not match Azure AD user."
                     )
