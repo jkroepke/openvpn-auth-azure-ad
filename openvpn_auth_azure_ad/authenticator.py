@@ -43,7 +43,7 @@ class AADAuthenticator(object):
         app: PublicClientApplication,
         graph_endpoint: str,
         authenticators: str,
-        verify_certificate_claim: str,
+        verify_certificate_claim: bool,
         auth_token: bool,
         auth_token_lifetime: int,
         remember_user: bool,
@@ -145,7 +145,7 @@ class AADAuthenticator(object):
             )
 
     def verify_client_certificate(self, client, result) -> bool:
-        if self._verify_certificate_claim == "":
+        if not self._verify_certificate_claim:
             return True
 
         if "common_name" not in client["env"]:
