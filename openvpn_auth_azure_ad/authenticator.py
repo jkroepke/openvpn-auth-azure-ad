@@ -145,7 +145,7 @@ class AADAuthenticator(object):
             )
 
     def verify_client_certificate(self, client, result) -> bool:
-        if self._verify_certificate_claim == False:
+        if not self._verify_certificate_claim:
             return True
 
         if "common_name" not in client["env"]:
