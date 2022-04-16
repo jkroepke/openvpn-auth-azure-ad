@@ -14,11 +14,12 @@ class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
             self._function_wrapper, fn, *args, **kwargs
         )
 
-    def _function_wrapper(self, fn, *args, **kwargs):
+    @staticmethod
+    def _function_wrapper(fn, *args, **kwargs):
         """Wraps `fn` in order to preserve the traceback of any kind of
         raised exception
-
         """
+        # noinspection PyBroadException
         try:
             return fn(*args, **kwargs)
         except Exception:

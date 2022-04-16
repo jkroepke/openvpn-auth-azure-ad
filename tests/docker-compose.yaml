@@ -1,0 +1,53 @@
+version: '3'
+services:
+  openvpn:
+    image: martin/openvpn
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "1194:1194/udp"
+      - "8080:8080/tcp"
+      - "8081:8081/tcp"
+    volumes:
+      - ./openvpn:/etc/openvpn
+    restart: always
+    environment:
+      EASYRSA_REQ_CN: localhost
+      EASYRSA_BATCH: 1
+      UPN: "${UPN}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |-
+        if [ ! -f /etc/openvpn/openvpn.conf ]; then
+          initopenvpn -u udp://localhost
+          sed -i '/comp-lzo/d' /etc/openvpn/openvpn.conf
+          sed -i '/cipher.*/d' /etc/openvpn/openvpn.conf
+          sed -i '/.*dhcp-option DNS.*/d' /etc/openvpn/openvpn.conf
+
+          echo 'management 0.0.0.0 8081' >> /etc/openvpn/openvpn.conf
+          echo 'management-hold' >> /etc/openvpn/openvpn.conf
+          echo 'management-client-auth' >> /etc/openvpn/openvpn.conf
+          echo 'reneg-sec 60' >> /etc/openvpn/openvpn.conf
+        fi
+
+        if [ ! -f /etc/openvpn/pki/ca.crt ];
+          then initpki nopass;
+        fi;
+
+        if [ ! -f /etc/openvpn/${UPN}.ovpn ]; then
+          easyrsa build-client-full ${UPN} nopass
+          getclient ${UPN} > /etc/openvpn/${UPN}.ovpn
+
+          sed -i '/redirect-gateway def1/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/verify-x509-name.*/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/comp-lzo/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/cipher.*/d' /etc/openvpn/${UPN}.ovpn
+          echo auth-user-pass >> /etc/openvpn/${UPN}.ovpn
+          echo auth-retry interact >> /etc/openvpn/${UPN}.ovpn
+        fi
+        exec startopenvpn
+
+volumes:
+  openvpn_data:
+  socket:

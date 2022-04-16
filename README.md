@@ -38,8 +38,6 @@ Currently, openvpn-auth-azure-ad supports 2 authentication method against Azure 
 Additionally, if enabled openvpn-auth-azure-ad supports OpenVPNs `auth-token` mechanismus to allow users to bypass
 then authenticator above on re-authentications, e.g. due `reneg-sec`.
 
-`auth-gen-token` must not set on the config.
-
 # Installation
 
 ## via pip
@@ -67,8 +65,8 @@ https://hub.docker.com/r/jkroepke/openvpn-auth-azure-ad
     -v <path of openvpn mgmt socket>:/openvpn/management.sock
     -v /etc/openvpn-auth-azure-ad/config.conf:/etc/openvpn-auth-azure-ad/config.conf \
     -e AAD_CLIENT_ID= \
-    -e AAD_OVPN_SOCKET_PATH=/openvpn/management.sock \
-    -e AAD_OVPN_PASSWORD= \
+    -e OPENVPN_AAD_AUTH_SOCKET_PATH=/openvpn/management.sock \
+    -e OPENVPN_AAD_AUTH_PASSWORD= \
     jkroepke/openvpn-auth-azure-ad
 ```
 
@@ -79,13 +77,10 @@ specified via -c). Config file syntax allows: key=value, flag=true, stuff=[a,b,c
 specified in more than one place, then commandline values override environment variables which override config file values which override defaults.
 
 ```
-usage: openvpn-auth-azure-ad.py [-h] [-c CONFIG] [-V] [-t THREADS] [-a AUTHENTICATORS] [--auth-token] [--auth-token-livetime AUTH_TOKEN_LIVETIME] [--remember-user] [--verify-common-name] [-H OVPN_HOST]
-                                [-P OVPN_PORT] [-s OVPN_SOCKET] [-p OVPN_PASSWORD] --client-id CLIENT_ID [--token-authority TOKEN_AUTHORITY] [--graph-endpoint GRAPH_ENDPOINT] [--prometheus]
-                                [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR] [--prometheus-listen-port PROMETHEUS_LISTEN_PORT] [--log-level LOG_LEVEL]
-
-Args that start with '--' (eg. -V) can also be set in a config file (/etc/openvpn-auth-azure-ad/config.conf or ~/.openvpn-auth-azure-ad or specified via -c). Config file syntax allows: key=value, flag=true,
-stuff=[a,b,c] (for details, see syntax at https://goo.gl/R74nmi). If an arg is specified in more than one place, then commandline values override environment variables which override config file values which
-override defaults.
+usage: openvpn-auth-azure-ad.py [-h] [-c CONFIG] [-V] [-t THREADS] [-a AUTHENTICATORS] [--auth-token] [--auth-token-lifetime AUTH_TOKEN_LIFETIME] [--remember-user] [--verify-openvpn-client]
+                                [--verify-openvpn-client-id-token-claim] [-H OPENVPN_HOST] [-P OPENVPN_PORT] [-s OPENVPN_SOCKET] [-p OPENVPN_PASSWORD] [--openvpn-release-hold] --client-id CLIENT_ID
+                                [--token-authority TOKEN_AUTHORITY] [--graph-endpoint GRAPH_ENDPOINT] [--prometheus] [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR]
+                                [--prometheus-listen-port PROMETHEUS_LISTEN_PORT] [--log-level LOG_LEVEL]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -99,20 +94,25 @@ OpenVPN User Authentication:
   -a AUTHENTICATORS, --authenticators AUTHENTICATORS
                         Enable authenticators. Multiple authenticators can be separated with comma [env var: AAD_AUTHENTICATORS]
   --auth-token          Use auth token to re-authenticate clients [env var: AAD_AUTH_TOKEN]
-  --auth-token-livetime AUTH_TOKEN_LIVETIME
-                        Livetime of auth tokens in seconds [env var: AAD_AUTH_TOKEN_LIFETIME]
+  --auth-token-lifetime AUTH_TOKEN_LIFETIME
+                        Lifetime of auth tokens in seconds [env var: AAD_AUTH_TOKEN_LIFETIME]
   --remember-user       If user authenticated once, the users refresh token is used to reauthenticate silently if possible. [env var: AAD_REMEMBER_USER]
-  --verify-common-name  Check if common_name matches Azure AD UPN [env var: AAD_VERIFY_COMMON_NAME]
+  --verify-openvpn-client
+                        Check if openvpn client common_name matches Azure AD token claim [env var: AAD_VERIFY_OPENVPN_CLIENT]
+  --verify-openvpn-client-id-token-claim
+                        AAD id_token claim used for client verification [env var: AAD_VERIFY_OPENVPN_CLIENT_ID_TOKEN_CLAIM]
 
 OpenVPN Management Interface settings:
-  -H OVPN_HOST, --ovpn-host OVPN_HOST
-                        Host of OpenVPN management interface. [env var: AAD_OVPN_HOST]
-  -P OVPN_PORT, --ovpn-port OVPN_PORT
-                        Port of OpenVPN management interface. [env var: AAD_OVPN_PORT]
-  -s OVPN_SOCKET, --ovpn-socket OVPN_SOCKET
-                        Path of socket or OpenVPN management interface. [env var: AAD_OVPN_SOCKET_PATH]
-  -p OVPN_PASSWORD, --ovpn-password OVPN_PASSWORD
-                        Passwort for OpenVPN management interface. [env var: AAD_OVPN_PASSWORD]
+  -H OPENVPN_HOST, --openvpn-host OPENVPN_HOST
+                        Host of OpenVPN management interface. [env var: OPENVPN_AAD_AUTH_HOST]
+  -P OPENVPN_PORT, --openvpn-port OPENVPN_PORT
+                        Port of OpenVPN management interface. [env var: OPENVPN_AAD_AUTH_PORT]
+  -s OPENVPN_SOCKET, --openvpn-socket OPENVPN_SOCKET
+                        Path of socket or OpenVPN management interface. [env var: OPENVPN_AAD_AUTH_SOCKET_PATH]
+  -p OPENVPN_PASSWORD, --openvpn-password OPENVPN_PASSWORD
+                        Passwort for OpenVPN management interface. [env var: OPENVPN_AAD_AUTH_PASSWORD]
+  --openvpn-release-hold
+                        Release hold on OpenVPN Server if --management-hold is enabled [env var: OPENVPN_AAD_AUTH_RELEASE_HOLD]
 
 Azure AD settings:
   --client-id CLIENT_ID
@@ -152,8 +152,11 @@ See: https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-
 
 ### server.conf
 
+Use `auth-gen-token` only on OpenVPN 2.5+. It conflicts with `--auth-token`.
+
 ```
 management socket-name unix [pw-file]
+management-hold
 management-client-auth
 ```
 
