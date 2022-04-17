@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0]
 
 ### Added
 
@@ -84,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release
 
-[unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/jkroepke/openvpn-auth-azure-ad/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v2.0.0
 [1.2.0]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v1.2.0
 [1.1.3]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v1.1.3
 [1.1.2]: https://github.com/jkroepke/openvpn-auth-azure-ad/releases/tag/v1.1.2
