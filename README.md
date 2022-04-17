@@ -17,15 +17,15 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ### Python
 
-- Python 3.8
+- Python 3.8 / 3.10
 
 ### Server
 
-- OpenVPN 2.4.9
+- OpenVPN 2.5.6
 
 ### Client
 
-- Tunnelblick 3.8.3
+- Tunnelblick 3.8.7a
 
 # Authenticators
 
