@@ -60,6 +60,8 @@ jobs:
   release:
     name: Create release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - publish
     runs-on: ubuntu-latest
     steps:
       - name: Create Release
