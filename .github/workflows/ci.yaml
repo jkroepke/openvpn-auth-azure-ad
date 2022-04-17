@@ -46,7 +46,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    name: Build
+    name: Docker
     needs:
       - build
       - lint
