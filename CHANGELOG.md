@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support management-hold
+- Added `--verify-openvpn-client-id-token-claim`
+- Better handling in reconnection scenarios
+- Better logging
+
 ### Changed
+
+- Change `--verify-common-name` to `--verify-openvpn-client`
+- Refactor project to PEP-517 standard
 
 ### Removed
 
