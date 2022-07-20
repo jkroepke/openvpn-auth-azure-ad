@@ -382,12 +382,15 @@ class AADAuthenticator(object):
 
         client["state_id"] = util.generated_id()
         if self._remember_user_enabled:
-            accounts = self._app.get_accounts()
+            accounts = self._app.get_accounts(client["env"]["username"])
             if "common_name" not in client["env"] and accounts:
+                result = self._app.acquire_token_silent(
+                    self.token_scopes, account=accounts[0]
+                )
+            elif "common_name" in client["env"]:
                 result = self._app.acquire_token_silent(
                     self.token_scopes, account=client["env"]["common_name"]
                 )
-
             if util.is_authenticated(result):
                 self.setup_auth_token(client)
                 self._states["authenticated"].set(
