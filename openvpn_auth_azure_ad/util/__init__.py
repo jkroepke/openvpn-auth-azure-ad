@@ -9,7 +9,7 @@ def b64encode_string(s: str) -> str:
 
 
 def is_authenticated(result: dict) -> bool:
-    return "access_token" in result
+    return result is not None and "access_token" in result
 
 
 def generated_id() -> str:

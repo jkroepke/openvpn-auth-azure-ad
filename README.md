@@ -25,7 +25,8 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ### Client
 
-- Tunnelblick 3.8.7a
+- [OpenVPN Community Client for Windows 2.5.7](https://openvpn.net/community-downloads/)
+- [Tunnelblick 3.8.7a](https://tunnelblick.net/)
 
 # Authenticators
 
@@ -163,6 +164,14 @@ management-client-auth
 See [Reference manual for OpenVPN](https://openvpn.net/community-resources/reference-manual-for-openvpn-2-4/)
 for detailed `management` settings.
 
+#### If no client certificate are required
+
+If your setup does not require certificates, the following options are required:
+
+```
+username-as-common-name
+```
+
 ### client.conf
 
 ```
@@ -184,6 +193,6 @@ the prometheus endpoint listen on port 9723.
 
 # Copyright and license
 
-© [2020 Jan-Otto Kröpke (jkroepke)](https://github.com/jkroepke/helm-secrets)
+© [2022 Jan-Otto Kröpke (jkroepke)](https://github.com/jkroepke/helm-secrets)
 
 Licensed under the [MIT License](LICENSE.txt)
