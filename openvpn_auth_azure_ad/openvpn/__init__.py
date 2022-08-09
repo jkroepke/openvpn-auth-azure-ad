@@ -170,7 +170,7 @@ class OpenVPNManagementInterface(object):
 
     @contextlib.contextmanager
     def connection(self) -> Generator:
-        """Create context where management interface socket is open and close when done."""
+        """Create a context where management interface socket is open and close when done."""
         self.connect()
         try:
             yield
@@ -248,7 +248,7 @@ class OpenVPNManagementInterface(object):
         return self._recv_queue[queue_name].get()
 
     def send_command(self, cmd) -> Optional[str]:
-        """Send command to management interface and fetch response."""
+        """Send command to the management interface and fetch response."""
         if not self.is_connected:
             raise errors.NotConnectedError(
                 "You must be connected to the management interface to issue commands."
