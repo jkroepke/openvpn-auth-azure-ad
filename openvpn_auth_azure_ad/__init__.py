@@ -69,6 +69,14 @@ def main():
         env_var="AAD_REMEMBER_USER",
     )
     parser_authentication.add_argument(
+        "--openvpn-identity-key",
+        default="common_name",
+        choices=["common_name", "username"],
+        help="Define which value from OpenVPN should be used for identity the AAD user. Supported values: "
+        "'common_name', 'username'",
+        env_var="AAD_OPENVPN_IDENTITY_KEY",
+    )
+    parser_authentication.add_argument(
         "--verify-openvpn-client",
         action="store_true",
         help="Check if openvpn client common_name matches Azure AD token claim",
@@ -192,6 +200,7 @@ def main():
         app,
         options.graph_endpoint,
         options.authenticators,
+        options.openvpn_identity_key,
         options.verify_openvpn_client,
         options.verify_openvpn_client_id_token_claim,
         options.auth_token,

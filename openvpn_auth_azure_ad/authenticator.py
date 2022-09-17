@@ -35,35 +35,6 @@ class AADAuthenticatorFlows:
     AUTH_TOKEN = "auth_token"
 
 
-def format_log_prefix(client: dict) -> str:
-    prefix = "cid: %s" % (client["cid"],)
-    if "common_name" in client["env"]:
-        prefix += " | %s" % client["env"]["common_name"]
-
-    if "state_id" in client and client["state_id"] is not None:
-        prefix += " | %s" % client["state_id"]
-
-    return prefix
-
-
-def log_debug(client: dict, message: str) -> None:
-    prefix = format_log_prefix(client)
-
-    logger.debug("[%s]: %s" % (prefix, message))
-
-
-def log_info(client: dict, message: str) -> None:
-    prefix = format_log_prefix(client)
-
-    logger.info("[%s]: %s" % (prefix, message))
-
-
-def log_warn(client: dict, message: str) -> None:
-    prefix = format_log_prefix(client)
-
-    logger.warning("[%s]: %s" % (prefix, message))
-
-
 class AADAuthenticator(object):
     token_scopes = ["User.ReadBasic.All"]
 
@@ -72,6 +43,7 @@ class AADAuthenticator(object):
         app: PublicClientApplication,
         graph_endpoint: str,
         authenticators: str,
+        openvpn_identity_key: str,
         verify_openvpn_client: bool,
         verify_openvpn_client_id_token_claim: bool,
         auth_token: bool,
@@ -99,6 +71,7 @@ class AADAuthenticator(object):
             }
         )
 
+        self._openvpn_identity_key = openvpn_identity_key
         self._verify_openvpn_client = verify_openvpn_client
         self._verify_openvpn_client_id_token_claim = (
             verify_openvpn_client_id_token_claim
@@ -140,7 +113,7 @@ class AADAuthenticator(object):
             logger.error(str(e), exc_info=e)
 
     def send_authentication_success(self, client: dict) -> None:
-        log_info(client, "authentication succeeded")
+        self.log_info(client, "authentication succeeded")
         if self._auth_token_enabled:
             self._openvpn.send_command(
                 "\n".join(("client-auth %s %s", 'push "auth-token %s"', "END"))
@@ -152,7 +125,7 @@ class AADAuthenticator(object):
             )
 
     def send_authentication_challenge(self, client: Dict, client_message: str) -> None:
-        log_debug(client, "authentication challenge: %s" % client_message)
+        self.log_debug(client, "authentication challenge: %s" % client_message)
 
         client_challenge = util.format_client_challenge(client, client_message)
         self._openvpn.send_command(
@@ -186,20 +159,22 @@ class AADAuthenticator(object):
                 client["auth_token"], client["state_id"], self._auth_token_lifetime
             )
 
-    def verify_client_certificate(self, client, result) -> bool:
+    def verify_openvpn_client(self, client, result) -> bool:
         if not self._verify_openvpn_client:
             return True
 
-        if "common_name" not in client["env"]:
-            log_warn(client, "Missing common_name in client env")
+        if self._openvpn_identity_key not in client["env"]:
+            self.log_warn(
+                client, "Missing %s in client env" % (self._openvpn_identity_key,)
+            )
             return False
 
         if "id_token_claims" not in result:
-            log_warn(client, "Could not get id_token_claims")
+            self.log_warn(client, "Could not get id_token_claims")
             return False
 
         if self._verify_openvpn_client_id_token_claim not in result["id_token_claims"]:
-            log_warn(
+            self.log_warn(
                 client,
                 "claim %s does not exist in id_token"
                 % (self._verify_openvpn_client_id_token_claim,),
@@ -207,20 +182,21 @@ class AADAuthenticator(object):
             return False
 
         verify_result = (
-            client["env"]["common_name"]
+            client["env"][self._openvpn_identity_key]
             == result["id_token_claims"][self._verify_openvpn_client_id_token_claim]
         )
 
         if not verify_result:
-            log_info(
+            self.log_info(
                 client,
                 (
-                    "client certificate common name does not match Azure AD user (claim: %s). "
+                    "OpenVPN %s does not match Azure AD user (claim: %s). "
                     + "Client certificate: '%s' - Azure AD: '%s'"
                 )
                 % (
+                    self._openvpn_identity_key,
                     self._verify_openvpn_client_id_token_claim,
-                    client["env"]["common_name"],
+                    client["env"][self._openvpn_identity_key],
                     result["id_token_claims"][
                         self._verify_openvpn_client_id_token_claim
                     ],
@@ -254,13 +230,13 @@ class AADAuthenticator(object):
         if "result" not in authenticated_state or "client" not in authenticated_state:
             return None
 
-        log_info(client, "Authenticate using auth-token flow")
+        self.log_info(client, "Authenticate using auth-token flow")
 
         # recheck if connected client is the same as inside the state.
         if (
             client["auth_token"] != authenticated_state["client"]["auth_token"]
-            or client["env"]["common_name"]
-            != authenticated_state["client"]["env"]["common_name"]
+            or client["env"][self._openvpn_identity_key]
+            != authenticated_state["client"]["env"][self._openvpn_identity_key]
             or client["env"]["username"]
             != authenticated_state["client"]["env"]["username"]
         ):
@@ -277,7 +253,7 @@ class AADAuthenticator(object):
         if not client["env"]["password"].startswith("CRV1::"):
             return None
 
-        # get state id from client
+        # get state id from the client
         state_id = util.get_state_id(client)
         if state_id is None:
             return None
@@ -296,37 +272,36 @@ class AADAuthenticator(object):
         if "flow" not in state:
             return None
 
-        log_info(client, "Continue to authenticate using device token flow")
+        self.log_info(client, "Continue to authenticate using device token flow")
         result = self.device_token_finish(state)
 
         return result
 
     def client_connect(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
-        log_info(client, "Received client connect")
+        self.log_info(client, "Received client connect")
         openvpn_auth_azure_ad_events.labels("connect").inc()
         self.authenticate_client(client)
 
-    @staticmethod
-    def client_disconnect(data: str) -> None:
+    def client_disconnect(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
-        log_info(client, "Received client disconnect event")
+        self.log_info(client, "Received client disconnect event")
         openvpn_auth_azure_ad_events.labels("disconnect").inc()
 
     def client_reauth(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
-        log_info(client, "Received client re auth event")
+        self.log_info(client, "Received client re auth event")
         openvpn_auth_azure_ad_events.labels("reauth").inc()
         self.authenticate_client(client)
 
     def authenticate_client(self, client: dict) -> None:
         result = {}
         if client["reason"] == "reauth":
-            # allow clients to bypass azure ad authentication by reauthenticate via auth-token
+            # allow clients to bypass azure ad authentication by reauthenticate via an auth-token
             result = self.handle_reauth(client)
             if result is not None:
                 if util.is_authenticated(result):
-                    if not self.verify_client_certificate(client, result):
+                    if not self.verify_openvpn_client(client, result):
                         self.send_authentication_error(
                             client, "client_certificate_not_matched", None
                         )
@@ -335,7 +310,7 @@ class AADAuthenticator(object):
                     openvpn_auth_azure_ad_auth_succeeded.labels(
                         AADAuthenticatorFlows.AUTH_TOKEN
                     ).inc()
-                    log_info(client, "auth-token flow succeeded")
+                    self.log_info(client, "auth-token flow succeeded")
                     self.send_authentication_success(client)
                     return
 
@@ -344,7 +319,7 @@ class AADAuthenticator(object):
             if result is not None:
                 client["state_id"] = util.get_state_id(client)
                 if util.is_authenticated(result):
-                    if not self.verify_client_certificate(client, result):
+                    if not self.verify_openvpn_client(client, result):
                         self.send_authentication_error(
                             client, "client_certificate_not_matched", None
                         )
@@ -357,7 +332,7 @@ class AADAuthenticator(object):
                     openvpn_auth_azure_ad_auth_succeeded.labels(
                         AADAuthenticatorFlows.DEVICE_TOKEN
                     ).inc()
-                    log_info(client, "device token flow succeeded")
+                    self.log_info(client, "device token flow succeeded")
                     self.send_authentication_success(client)
                     return
                 else:
@@ -367,10 +342,10 @@ class AADAuthenticator(object):
 
                     if 70016 in result.get("error_codes", []):
                         error = "device token flow errored: no user action"
-                        log_info(client, error)
+                        self.log_info(client, error)
                         self.send_authentication_error(client, error, None)
                     else:
-                        log_info(
+                        self.log_info(
                             client,
                             "device token flow errored: %s "
                             % util.format_error(result),
@@ -382,10 +357,14 @@ class AADAuthenticator(object):
 
         client["state_id"] = util.generated_id()
         if self._remember_user_enabled:
-            if "common_name" in client["env"]:
-                result = self._app.acquire_token_silent(
-                    self.token_scopes, account=client["env"]["common_name"]
+            if self._openvpn_identity_key in client["env"]:
+                accounts = self._app.get_accounts(
+                    client["env"][self._openvpn_identity_key]
                 )
+                if accounts:
+                    result = self._app.acquire_token_silent(
+                        self.token_scopes, account=accounts[0]
+                    )
 
             if util.is_authenticated(result):
                 self.setup_auth_token(client)
@@ -396,7 +375,7 @@ class AADAuthenticator(object):
                 return
 
         if AADAuthenticatorFlows.USER_PASSWORD in self._authenticators:
-            log_debug(client, "Authenticate using username/password flow")
+            self.log_debug(client, "Authenticate using username/password flow")
             openvpn_auth_azure_ad_auth_total.labels(
                 AADAuthenticatorFlows.USER_PASSWORD
             ).inc()
@@ -407,7 +386,7 @@ class AADAuthenticator(object):
             )
 
             if util.is_authenticated(result):
-                if not self.verify_client_certificate(client, result):
+                if not self.verify_openvpn_client(client, result):
                     self.send_authentication_error(
                         client, "client_certificate_not_matched", None
                     )
@@ -430,17 +409,17 @@ class AADAuthenticator(object):
                     error = util.format_error(result)
                     self.send_authentication_error(client, error, None)
 
-                log_info(client, "password flow errored: %s" % (error,))
+                self.log_info(client, "password flow errored: %s" % (error,))
                 return
 
             openvpn_auth_azure_ad_auth_succeeded.labels(
                 AADAuthenticatorFlows.USER_PASSWORD
             ).inc()
-            log_info(client, "password flow succeeded")
-            # Do not send successful auth command, because device token can be enabled.
+            self.log_info(client, "password flow succeeded")
+            # Do not send a successful auth command, because a device token can be enabled.
 
         if AADAuthenticatorFlows.DEVICE_TOKEN in self._authenticators:
-            log_info(client, "Start to authenticate using device token flow")
+            self.log_info(client, "Start to authenticate using device token flow")
             flow = self.device_auth_start()
             message = flow["message"] + " Then press OK here."
 
@@ -510,3 +489,28 @@ class AADAuthenticator(object):
                 raise errors.ParseError("Can't parse line: %s" % (line,))
 
         return client
+
+    def format_log_prefix(self, client: dict) -> str:
+        prefix = "cid: %s" % (client["cid"],)
+        if self._openvpn_identity_key in client["env"]:
+            prefix += " | %s" % client["env"][self._openvpn_identity_key]
+
+        if "state_id" in client and client["state_id"] is not None:
+            prefix += " | %s" % client["state_id"]
+
+        return prefix
+
+    def log_debug(self, client: dict, message: str) -> None:
+        prefix = self.format_log_prefix(client)
+
+        logger.debug("[%s]: %s" % (prefix, message))
+
+    def log_info(self, client: dict, message: str) -> None:
+        prefix = self.format_log_prefix(client)
+
+        logger.info("[%s]: %s" % (prefix, message))
+
+    def log_warn(self, client: dict, message: str) -> None:
+        prefix = self.format_log_prefix(client)
+
+        logger.warning("[%s]: %s" % (prefix, message))
