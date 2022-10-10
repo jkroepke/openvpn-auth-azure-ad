@@ -76,9 +76,8 @@ class OpenVPNManagementInterface(object):
         """Connect to management interface socket."""
         while True:
             logger.info(
-                "Connecting to OpenVPN management %s:%d.",
-                self._mgmt_host,
-                int(self._mgmt_port),
+                "Connecting to OpenVPN management %s.",
+                self.mgmt_address(),
             )
 
             try:
