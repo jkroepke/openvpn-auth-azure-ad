@@ -64,13 +64,12 @@ class OpenVPNManagementInterface(object):
         """Get SocketType object for this VPN."""
         return self._type
 
-    @property
     def mgmt_address(self) -> str:
         """Get address of management interface."""
         if self.type == SocketType.IP:
             return f"{self._mgmt_host}:{self._mgmt_port}"
         else:
-            return str(self._mgmt_socket)
+            return self._mgmt_socket
 
     def connect(self, retry: bool = False) -> Optional[bool]:
         """Connect to management interface socket."""
