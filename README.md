@@ -161,6 +161,7 @@ Use `auth-gen-token` only on OpenVPN 2.5+. It conflicts with `--auth-token`.
 management socket-name unix [pw-file]
 management-hold
 management-client-auth
+auth-user-pass-optional #To enable Bypass Cert Common Name for Certain Users not login in through AzureAD
 ```
 
 See [Reference manual for OpenVPN](https://openvpn.net/community-resources/reference-manual-for-openvpn-2-4/)
