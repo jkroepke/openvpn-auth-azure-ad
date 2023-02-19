@@ -2,6 +2,7 @@ version: '3'
 services:
   openvpn:
     image: martin/openvpn
+    # image: nmaguiar/openvpn
     cap_add:
       - NET_ADMIN
     ports:

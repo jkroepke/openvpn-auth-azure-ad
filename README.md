@@ -17,7 +17,7 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ### Python
 
-- Python 3.8 / 3.10
+- Python 3.11
 
 ### Server
 

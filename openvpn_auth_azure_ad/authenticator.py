@@ -7,6 +7,7 @@ from cacheout import CacheManager
 from msal import PublicClientApplication
 from prometheus_client import Counter
 
+from .types import ClientDataType
 from . import util
 from ._version import __version__
 from .openvpn import OpenVPNManagementInterface
@@ -159,7 +160,7 @@ class AADAuthenticator(object):
                 client["auth_token"], client["state_id"], self._auth_token_lifetime
             )
 
-    def verify_openvpn_client(self, client, result) -> bool:
+    def verify_openvpn_client(self, client: ClientDataType, result) -> bool:
         if not self._verify_openvpn_client:
             return True
 
@@ -249,7 +250,7 @@ class AADAuthenticator(object):
 
         return result
 
-    def handle_response_challenge(self, client: Dict) -> Optional[dict]:
+    def handle_response_challenge(self, client: ClientDataType) -> Optional[dict]:
         if not client["env"]["password"].startswith("CRV1::"):
             return None
 
@@ -294,7 +295,7 @@ class AADAuthenticator(object):
         openvpn_auth_azure_ad_events.labels("reauth").inc()
         self.authenticate_client(client)
 
-    def authenticate_client(self, client: dict) -> None:
+    def authenticate_client(self, client: ClientDataType) -> None:
         result = {}
         if client["reason"] == "reauth":
             # allow clients to bypass azure ad authentication by reauthenticate via an auth-token
@@ -456,8 +457,8 @@ class AADAuthenticator(object):
         return self._app.acquire_token_by_device_flow(state["flow"])
 
     @staticmethod
-    def parse_client_data(data: str) -> dict:
-        client = {
+    def parse_client_data(data: str) -> ClientDataType:
+        client: ClientDataType = {
             "env": {},
             "reason": None,
             "cid": None,
@@ -466,18 +467,20 @@ class AADAuthenticator(object):
         }
 
         for line in data.splitlines():
+            logger.debug(line)
+
             try:
                 if line.startswith(">CLIENT:CONNECT") or line.startswith(
                     ">CLIENT:REAUTH"
                 ):
                     client_info = line.split(",")
                     client["reason"] = client_info[0].replace(">CLIENT:", "").lower()
-                    client["cid"] = client_info[1]
-                    client["kid"] = client_info[2]
+                    client["cid"] = int(client_info[1])
+                    client["kid"] = int(client_info[2])
                 elif line.startswith(">CLIENT:DISCONNECT"):
                     client_info = line.split(",")
                     client["reason"] = client_info[0].replace(">CLIENT:", "").lower()
-                    client["cid"] = client_info[1]
+                    client["cid"] = int(client_info[1])
                 elif line.startswith(">CLIENT:ENV,"):
                     client_env = line.split(",")[1].split("=")
                     client["env"][client_env[0]] = (
@@ -490,7 +493,7 @@ class AADAuthenticator(object):
 
         return client
 
-    def format_log_prefix(self, client: dict) -> str:
+    def format_log_prefix(self, client: ClientDataType) -> str:
         prefix = "cid: %s" % (client["cid"],)
         if self._openvpn_identity_key in client["env"]:
             prefix += " | %s" % client["env"][self._openvpn_identity_key]
@@ -500,17 +503,17 @@ class AADAuthenticator(object):
 
         return prefix
 
-    def log_debug(self, client: dict, message: str) -> None:
+    def log_debug(self, client: ClientDataType, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
         logger.debug("[%s]: %s" % (prefix, message))
 
-    def log_info(self, client: dict, message: str) -> None:
+    def log_info(self, client: ClientDataType, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
         logger.info("[%s]: %s" % (prefix, message))
 
-    def log_warn(self, client: dict, message: str) -> None:
+    def log_warn(self, client: ClientDataType, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
         logger.warning("[%s]: %s" % (prefix, message))
