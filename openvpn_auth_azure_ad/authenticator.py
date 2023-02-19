@@ -43,6 +43,7 @@ class AADAuthenticator(object):
         app: PublicClientApplication,
         graph_endpoint: str,
         authenticators: str,
+        bypass_cns: str,
         openvpn_identity_key: str,
         verify_openvpn_client: bool,
         verify_openvpn_client_id_token_claim: bool,
@@ -59,6 +60,7 @@ class AADAuthenticator(object):
         self._app = app
         self._graph_endpoint = graph_endpoint
         self._authenticators = [s.strip() for s in authenticators.split(",")]
+        self._bypass_cns = [s.strip() for s in bypass_cns.split(",")]
         self._openvpn = OpenVPNManagementInterface(
             release_hold, host, port, socket, password
         )
@@ -296,6 +298,9 @@ class AADAuthenticator(object):
 
     def authenticate_client(self, client: dict) -> None:
         result = {}
+        # Uncomment following 2 lines to Debug client dictionary
+        #for k, v in client["env"].items():
+        #    self.log_info(client, (k, v))
         if client["reason"] == "reauth":
             # allow clients to bypass azure ad authentication by reauthenticate via an auth-token
             result = self.handle_reauth(client)
@@ -313,6 +318,21 @@ class AADAuthenticator(object):
                     self.log_info(client, "auth-token flow succeeded")
                     self.send_authentication_success(client)
                     return
+
+        #Allow client to bypass depending on vpn config file common name and allowed cns in argument --bypass-cns        for cn in self._bypass_cns:
+        for cn in self._bypass_cns:
+            if client["reason"] == "connect" and client["env"]["common_name"] == cn:
+                self.log_info(client, "Bypassing Azure AD Login Flow for local user")
+                if not self.verify_openvpn_client(client, result):
+                    self.send_authentication_error(
+                        client, "client_certificate_not_matched", None
+                    )
+                    self.log_info(client, "Client Certificate not matched")
+                    return None
+                self.setup_auth_token(client)
+                self.log_info(client, "Local Auth Succeeded")
+                self.send_authentication_success(client)
+                return
 
         if AADAuthenticatorFlows.DEVICE_TOKEN in self._authenticators:
             result = self.handle_response_challenge(client)

@@ -42,6 +42,12 @@ def main():
     )
 
     parser_authentication = parser.add_argument_group("OpenVPN User Authentication")
+    
+    parser_authentication.add_argument(
+        '--bypass-cns',
+        help='Comma separated common names to bypass Azure AD login (cert only authentication)',
+    )
+
     parser_authentication.add_argument(
         "-a",
         "--authenticators",
@@ -200,6 +206,7 @@ def main():
         app,
         options.graph_endpoint,
         options.authenticators,
+        options.bypass_cns,
         options.openvpn_identity_key,
         options.verify_openvpn_client,
         options.verify_openvpn_client_id_token_claim,
