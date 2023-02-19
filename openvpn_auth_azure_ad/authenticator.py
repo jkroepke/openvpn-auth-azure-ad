@@ -51,11 +51,13 @@ class AADAuthenticator(object):
         auth_token_lifetime: int,
         remember_user: bool,
         threads: int,
+        release_hold: bool,
+        webauth: bool,
+        webauth_url: str,
         host: str = None,
         port: int = None,
         socket: str = None,
         password: str = None,
-        release_hold: bool = None,
     ):
         self._app = app
         self._graph_endpoint = graph_endpoint
@@ -80,6 +82,8 @@ class AADAuthenticator(object):
         self._auth_token_enabled = auth_token
         self._auth_token_lifetime = auth_token_lifetime
         self._remember_user_enabled = remember_user
+        self._webauth_enabled = webauth
+        self._webauth_url = webauth_url
         self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
@@ -125,7 +129,7 @@ class AADAuthenticator(object):
                 "client-auth-nt %s %s" % (client["cid"], client["kid"])
             )
 
-    def send_authentication_challenge(self, client: Dict, client_message: str) -> None:
+    def send_authentication_challenge(self, client: ClientDataType, client_message: str) -> None:
         self.log_debug(client, "authentication challenge: %s" % client_message)
 
         client_challenge = util.format_client_challenge(client, client_message)
@@ -134,8 +138,17 @@ class AADAuthenticator(object):
             % (client["cid"], client["kid"], "client_challenge", client_challenge)
         )
 
+    def send_webauth(self, client: ClientDataType, url: str) -> None:
+        self.log_debug(client, "authentication challenge: %s" % url)
+
+        extra_prefix = "OPEN_URL:" if "openurl" in client["env"]["IV_SSO"] else "WEB_AUTH::"
+        self._openvpn.send_command(
+            'client-pending-auth %s %s%s'
+            % (client["cid"], extra_prefix, url)
+        )
+
     def send_authentication_error(
-        self, client: dict, message: str, client_message: Optional[str]
+        self, client: ClientDataType, message: str, client_message: Optional[str]
     ) -> None:
         if client_message is None:
             self._openvpn.send_command(
@@ -429,6 +442,12 @@ class AADAuthenticator(object):
             openvpn_auth_azure_ad_auth_total.labels(
                 AADAuthenticatorFlows.DEVICE_TOKEN
             ).inc()
+
+            if self._webauth_enabled:
+                if "openurl" in client["env"]["IV_SSO"] or "webauth" in client["env"]["IV_SSO"]:
+                    self.send_webauth(client, "%s?code=%s" % (self._webauth_url, flow["device_code"]))
+                    return
+
             self.send_authentication_challenge(client, message)
             return
 
