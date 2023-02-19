@@ -92,6 +92,8 @@ optional arguments:
                         Amount of threads to handle authentication [env var: AAD_THREAD_COUNT]
 
 OpenVPN User Authentication:
+  --bypass-cns BYPASS_CNS
+                        Comma separated common names to bypass Azure AD login (cert only authentication)
   -a AUTHENTICATORS, --authenticators AUTHENTICATORS
                         Enable authenticators. Multiple authenticators can be separated with comma [env var: AAD_AUTHENTICATORS]
   --auth-token          Use auth token to re-authenticate clients [env var: AAD_AUTH_TOKEN]
