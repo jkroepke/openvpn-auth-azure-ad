@@ -78,12 +78,12 @@ specified via -c). Config file syntax allows: key=value, flag=true, stuff=[a,b,c
 specified in more than one place, then commandline values override environment variables which override config file values which override defaults.
 
 ```
-usage: openvpn-auth-azure-ad.py [-h] [-c CONFIG] [-V] [-t THREADS] [-a AUTHENTICATORS] [--auth-token] [--auth-token-lifetime AUTH_TOKEN_LIFETIME] [--remember-user] [--verify-openvpn-client]
-                                [--verify-openvpn-client-id-token-claim] [-H OPENVPN_HOST] [-P OPENVPN_PORT] [-s OPENVPN_SOCKET] [-p OPENVPN_PASSWORD] [--openvpn-release-hold] --client-id CLIENT_ID
-                                [--token-authority TOKEN_AUTHORITY] [--graph-endpoint GRAPH_ENDPOINT] [--prometheus] [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR]
-                                [--prometheus-listen-port PROMETHEUS_LISTEN_PORT] [--log-level LOG_LEVEL]
+usage: openvpn-auth-azure-ad.py [-h] [-c CONFIG] [-V] [-t THREADS] [-a AUTHENTICATORS] [--auth-token] [--auth-token-lifetime AUTH_TOKEN_LIFETIME] [--remember-user] [--webauth] [--webauth-url WEBAUTH_URL]
+                                [--openvpn-identity-key {common_name,username}] [--verify-openvpn-client] [--verify-openvpn-client-id-token-claim] [-H OPENVPN_HOST] [-P OPENVPN_PORT] [-s OPENVPN_SOCKET]
+                                [-p OPENVPN_PASSWORD] [--openvpn-release-hold] --client-id CLIENT_ID [--token-authority TOKEN_AUTHORITY] [--graph-endpoint GRAPH_ENDPOINT] [--prometheus]
+                                [--prometheus-listen-addr PROMETHEUS_LISTEN_ADDR] [--prometheus-listen-port PROMETHEUS_LISTEN_PORT] [--log-level LOG_LEVEL]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c CONFIG, --config CONFIG
                         path of config file [env var: AAD_CONFIG_PATH]
@@ -98,6 +98,11 @@ OpenVPN User Authentication:
   --auth-token-lifetime AUTH_TOKEN_LIFETIME
                         Lifetime of auth tokens in seconds [env var: AAD_AUTH_TOKEN_LIFETIME]
   --remember-user       If user authenticated once, the users refresh token is used to reauthenticate silently if possible. [env var: AAD_REMEMBER_USER]
+  --webauth             Support OpenVPN WebAuth capabilities, if client supports. [env var: AAD_REMEMBER_USER]
+  --webauth-url WEBAUTH_URL
+                        Wrapper Page for WebAuth capabilities. Copy docs/ folder to host a dedicated one. [env var: AAD_REMEMBER_USER]
+  --openvpn-identity-key {common_name,username}
+                        Define which value from OpenVPN should be used for identity the AAD user. Supported values: 'common_name', 'username' [env var: AAD_OPENVPN_IDENTITY_KEY]
   --verify-openvpn-client
                         Check if openvpn client common_name matches Azure AD token claim [env var: AAD_VERIFY_OPENVPN_CLIENT]
   --verify-openvpn-client-id-token-claim
@@ -119,8 +124,8 @@ Azure AD settings:
   --client-id CLIENT_ID
                         Client ID of application. [env var: AAD_CLIENT_ID]
   --token-authority TOKEN_AUTHORITY
-                        A URL that identifies a token authority. It should be of the format https://login.microsoftonline.com/your_tenant. By default, we will use https://login.microsoftonline.com/organizations
-                        [env var: AAD_TOKEN_AUTHORITY]
+                        A URL that identifies a token authority. It should be of the format https://login.microsoftonline.com/your_tenant. By default, we will use
+                        https://login.microsoftonline.com/organizations [env var: AAD_TOKEN_AUTHORITY]
   --graph-endpoint GRAPH_ENDPOINT
                         Endpoint of the graph API. See: https://developer.microsoft.com/en-us/graph/graph-explorer [env var: AAD_GRAPH_ENDPOINT]
 
@@ -132,6 +137,10 @@ Prometheus settings:
                         prometheus statistics [env var: AAD_PROMETHEUS_PORT]
   --log-level LOG_LEVEL
                         Configure the logging level. [env var: AAD_LOG_LEVEL]
+
+Args that start with '--' (eg. -V) can also be set in a config file (/etc/openvpn-auth-azure-ad/config.conf or ~/.openvpn-auth-azure-ad or specified via -c). Config file syntax allows: key=value, flag=true,
+stuff=[a,b,c] (for details, see syntax at https://goo.gl/R74nmi). If an arg is specified in more than one place, then commandline values override environment variables which override config file values which
+override defaults.
 ```
 
 ## Register an app with AAD
