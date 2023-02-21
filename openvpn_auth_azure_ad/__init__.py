@@ -69,6 +69,18 @@ def main():
         env_var="AAD_REMEMBER_USER",
     )
     parser_authentication.add_argument(
+        "--webauth",
+        action="store_true",
+        help="Support OpenVPN WebAuth capabilities, if client supports.",
+        env_var="AAD_REMEMBER_USER",
+    )
+    parser_authentication.add_argument(
+        "--webauth-url",
+        default="https://jkroepke.github.io/openvpn-auth-azure-ad/",
+        help="Wrapper Page for WebAuth capabilities. Copy docs/ folder to host a dedicated one.",
+        env_var="AAD_REMEMBER_USER",
+    )
+    parser_authentication.add_argument(
         "--openvpn-identity-key",
         default="common_name",
         choices=["common_name", "username"],
@@ -207,11 +219,13 @@ def main():
         options.auth_token_lifetime,
         options.remember_user,
         options.threads,
+        options.openvpn_release_hold,
+        options.webauth,
+        options.webauth_url,
         options.openvpn_host,
         options.openvpn_port,
         options.openvpn_socket,
         options.openvpn_password,
-        options.openvpn_release_hold,
     )
 
     aad_authenticator.run()
