@@ -147,7 +147,7 @@ See: https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-
 5. Copy the client-id. You need the client-id as configuration option for `openvpn-auth-azure-ad`.
 6. Click on Authentication on the left menu
 7. "Add a platform", pick Mobile and desktop applications and chose the "MSAL only" option.
-8. On Advanced settings, set "Treat application as a public client" to yes.
+8. On Advanced settings, set "Allow public client flows" to yes.
 
 ## Required settings on OpenVPN configuration files
 
