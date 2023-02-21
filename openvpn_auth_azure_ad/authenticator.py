@@ -138,13 +138,21 @@ class AADAuthenticator(object):
             % (client["cid"], client["kid"], "client_challenge", client_challenge)
         )
 
-    def send_webauth(self, client: ClientDataType, url: str) -> None:
+    def send_webauth(self, client: ClientDataType, url: str, timeout: int) -> None:
         self.log_debug(client, "authentication challenge: %s" % url)
 
         extra_prefix = "OPEN_URL:" if "openurl" in client["env"]["IV_SSO"] else "WEB_AUTH::"
         self._openvpn.send_command(
-            'client-pending-auth %s %s%s'
-            % (client["cid"], extra_prefix, url)
+            'client-pending-auth %s %s%s %s'
+            % (client["cid"], extra_prefix, url, timeout)
+        )
+
+    def send_crtext(self, client: ClientDataType, message: str, timeout: int) -> None:
+        self.log_debug(client, "authentication challenge: %s" % message)
+
+        self._openvpn.send_command(
+            'client-pending-auth %s CR_TEXT:R,E:%s %s'
+            % (client["cid"], message, timeout)
         )
 
     def send_authentication_error(
@@ -287,9 +295,7 @@ class AADAuthenticator(object):
             return None
 
         self.log_info(client, "Continue to authenticate using device token flow")
-        result = self.device_token_finish(state)
-
-        return result
+        return self.device_token_finish(state["flow"])
 
     def client_connect(self, data: str) -> None:
         client = AADAuthenticator.parse_client_data(data)
@@ -332,42 +338,7 @@ class AADAuthenticator(object):
             result = self.handle_response_challenge(client)
             if result is not None:
                 client["state_id"] = util.get_state_id(client)
-                if util.is_authenticated(result):
-                    if not self.verify_openvpn_client(client, result):
-                        self.send_authentication_error(
-                            client, "client_certificate_not_matched", None
-                        )
-                        return None
-
-                    self.setup_auth_token(client)
-                    self._states["authenticated"].set(
-                        client["state_id"], {"client": client, "result": result}
-                    )
-                    openvpn_auth_azure_ad_auth_succeeded.labels(
-                        AADAuthenticatorFlows.DEVICE_TOKEN
-                    ).inc()
-                    self.log_info(client, "device token flow succeeded")
-                    self.send_authentication_success(client)
-                    return
-                else:
-                    openvpn_auth_azure_ad_auth_failures.labels(
-                        AADAuthenticatorFlows.DEVICE_TOKEN
-                    ).inc()
-
-                    if 70016 in result.get("error_codes", []):
-                        error = "device token flow errored: no user action"
-                        self.log_info(client, error)
-                        self.send_authentication_error(client, error, None)
-                    else:
-                        self.log_info(
-                            client,
-                            "device token flow errored: %s "
-                            % util.format_error(result),
-                        )
-                        self.send_authentication_error(
-                            client, util.format_error(result), None
-                        )
-                    return
+                return self.handle_device_token_result(client, result)
 
         client["state_id"] = util.generated_id()
         if self._remember_user_enabled:
@@ -435,20 +406,26 @@ class AADAuthenticator(object):
         if AADAuthenticatorFlows.DEVICE_TOKEN in self._authenticators:
             self.log_info(client, "Start to authenticate using device token flow")
             flow = self.device_auth_start()
-            message = flow["message"] + " Then press OK here."
-
-            self._states["challenge"].set(client["state_id"], {"flow": flow})
 
             openvpn_auth_azure_ad_auth_total.labels(
                 AADAuthenticatorFlows.DEVICE_TOKEN
             ).inc()
 
-            if self._webauth_enabled:
-                if "openurl" in client["env"]["IV_SSO"] or "webauth" in client["env"]["IV_SSO"]:
-                    self.send_webauth(client, "%s?code=%s" % (self._webauth_url, flow["device_code"]))
-                    return
+            if self._webauth_enabled and "IV_SSO" in client["env"] and ("openurl" in client["env"]["IV_SSO"] or "webauth" in client["env"]["IV_SSO"]):
+                self.send_webauth(client, "%s?code=%s" % (self._webauth_url, flow["user_code"]), 600)
+                self.handle_device_token_result(client, self.device_token_finish(flow))
+                return
 
-            self.send_authentication_challenge(client, message)
+            self._states["challenge"].set(client["state_id"], {"flow": flow})
+            message = flow["message"] + " Then press OK here."
+
+            if "IV_SSO" in client["env"] and "crtext" in client["env"]["IV_SSO"]:
+                self.log_info(client, "crtext")
+                self.send_crtext(client, message, 600)
+            else:
+                self.log_info(client, "old")
+                self.log_info(client, client["env"]["IV_SSO"])
+                self.send_authentication_challenge(client, message)
             return
 
         self.setup_auth_token(client)
@@ -457,6 +434,44 @@ class AADAuthenticator(object):
         )
         self.send_authentication_success(client)
         return
+
+    def handle_device_token_result(self, client: ClientDataType, result: dict):
+        if util.is_authenticated(result):
+            if not self.verify_openvpn_client(client, result):
+                self.send_authentication_error(
+                    client, "client_certificate_not_matched", None
+                )
+                return None
+
+            self.setup_auth_token(client)
+            self._states["authenticated"].set(
+                client["state_id"], {"client": client, "result": result}
+            )
+            openvpn_auth_azure_ad_auth_succeeded.labels(
+                AADAuthenticatorFlows.DEVICE_TOKEN
+            ).inc()
+            self.log_info(client, "device token flow succeeded")
+            self.send_authentication_success(client)
+            return
+        else:
+            openvpn_auth_azure_ad_auth_failures.labels(
+                AADAuthenticatorFlows.DEVICE_TOKEN
+            ).inc()
+
+            if 70016 in result.get("error_codes", []):
+                error = "device token flow errored: no user action"
+                self.log_info(client, error)
+                self.send_authentication_error(client, error, None)
+            else:
+                self.log_info(
+                    client,
+                    "device token flow errored: %s "
+                    % util.format_error(result),
+                )
+                self.send_authentication_error(
+                    client, util.format_error(result), None
+                )
+            return
 
     def device_auth_start(self) -> dict:
         flow = self._app.initiate_device_flow(scopes=self.token_scopes)
@@ -468,12 +483,12 @@ class AADAuthenticator(object):
 
         return flow
 
-    def device_token_finish(self, state: dict) -> dict:
+    def device_token_finish(self, flow: dict) -> dict:
         # Block authentication at least for 120 seconds
-        state["flow"]["expires_in"] = 60
-        state["flow"]["expires_at"] = time.time() + state["flow"]["expires_in"]
+        flow["expires_in"] = 60
+        flow["expires_at"] = time.time() + flow["expires_in"]
 
-        return self._app.acquire_token_by_device_flow(state["flow"])
+        return self._app.acquire_token_by_device_flow(flow)
 
     @staticmethod
     def parse_client_data(data: str) -> ClientDataType:
@@ -501,7 +516,7 @@ class AADAuthenticator(object):
                     client["reason"] = client_info[0].replace(">CLIENT:", "").lower()
                     client["cid"] = int(client_info[1])
                 elif line.startswith(">CLIENT:ENV,"):
-                    client_env = line.split(",")[1].split("=")
+                    client_env = line.split(",", 1)[1].split("=")
                     client["env"][client_env[0]] = (
                         client_env[1] if len(client_env) == 2 else ""
                     )
