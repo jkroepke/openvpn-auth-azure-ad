@@ -1,8 +1,62 @@
 version: '3'
 services:
+  openvpn26:
+    image: openvpn:2.6
+    init: true
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "0.0.0.0:1194:1194/udp"
+      - "8080:8080/tcp"
+      - "8081:8081/tcp"
+    volumes:
+      - ./openvpn26:/etc/openvpn
+      - ../v2/main:/main
+      - ../v2/openvpn-auth-azure-ad.yaml:/etc/openvpn/openvpn-auth-azure-ad.yaml
+    restart: always
+    environment:
+      DEBUG: 1
+      OVPN_DEFROUTE: 0
+      OVPN_NAT: 0
+      EASYRSA_BATCH: 1
+      UPN: "${UPN}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |-
+        chmod +x /main
+
+        if [ ! -f /etc/openvpn/openvpn.conf ]; then
+          initopenvpn -u udp://localhost
+          sed -i '/comp-lzo/d' /etc/openvpn/openvpn.conf
+          sed -i '/cipher.*/d' /etc/openvpn/openvpn.conf
+          sed -i '/.*dhcp-option DNS.*/d' /etc/openvpn/openvpn.conf
+          sed -i '/mute 20/d' /etc/openvpn/openvpn.conf
+          echo 'reneg-sec 120' >> /etc/openvpn/openvpn.conf
+          echo 'script-security 3' >> /etc/openvpn/openvpn.conf
+          echo 'auth-user-pass-verify "/main /etc/openvpn/openvpn-auth-azure-ad.yaml" via-file' >> /etc/openvpn/openvpn.conf
+        fi
+
+        if [ ! -f /etc/openvpn/pki/ca.crt ];
+          then initpki nopass;
+        fi;
+
+        if [ ! -f /etc/openvpn/${UPN}.ovpn ]; then
+          easyrsa build-client-full ${UPN} nopass
+          getclient ${UPN} > /etc/openvpn/${UPN}.ovpn
+
+          sed -i '/redirect-gateway def1/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/verify-x509-name.*/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/comp-lzo/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/cipher.*/d' /etc/openvpn/${UPN}.ovpn
+          sed -i '/push "block-outside-dns"/d' /etc/openvpn/${UPN}.ovpn
+          echo auth-user-pass >> /etc/openvpn/${UPN}.ovpn
+          echo verb 3 >> /etc/openvpn/${UPN}.ovpn
+        fi
+        exec startopenvpn
+
   openvpn:
     image: martin/openvpn
-    # image: nmaguiar/openvpn
     cap_add:
       - NET_ADMIN
     ports:
