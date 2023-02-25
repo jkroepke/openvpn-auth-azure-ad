@@ -8,45 +8,55 @@ import (
 )
 
 type Config struct {
-	Azuread AzureAd `yaml:"azuread"`
-	Openvpn OpenVpn `yaml:"openvpn"`
+	AzureAd AzureAd `yaml:"azuread"`
+	OpenVpn OpenVpn `yaml:"openvpn"`
 }
 type AzureAd struct {
 	Authority   string   `yaml:"authority"`
+	Timeout     int      `yaml:"timeout"`
 	TokenScopes []string `yaml:"tokenScopes"`
 	ClientId    string   `yaml:"clientId"`
 }
 type OpenVpn struct {
-	UrlHelper     string `yaml:"urlHelper"`
-	MatchUsername bool   `yaml:"matchUsername"`
+	AuthMode                string `yaml:"authMode"`
+	UrlHelper               string `yaml:"urlHelper"`
+	MatchUsernameClientCn   bool   `yaml:"matchUsernameClientCn"`
+	MatchUsernameTokenField string `yaml:"matchUsernameTokenField"`
 }
 
 func LoadConfig(configFile string) (Config, error) {
-	config := Config{
-		Azuread: AzureAd{
+	conf := Config{
+		AzureAd: AzureAd{
 			ClientId:    "",
+			Timeout:     30,
 			TokenScopes: []string{"user.read"},
 			Authority:   "https://login.microsoftonline.com/organizations",
 		},
-		Openvpn: OpenVpn{
-			UrlHelper:     "https://jkroepke.github.io/openvpn-auth-azure-ad/",
-			MatchUsername: true,
+		OpenVpn: OpenVpn{
+			AuthMode:                "openurl",
+			UrlHelper:               "https://jkroepke.github.io/openvpn-auth-azure-ad/",
+			MatchUsernameClientCn:   true,
+			MatchUsernameTokenField: "PreferredUsername",
 		},
 	}
 
 	configFileContent, err := os.ReadFile(configFile)
 
 	if err != nil {
-		return config, err
+		return conf, err
 	}
 
-	if err = yaml.Unmarshal(configFileContent, &config); err != nil {
-		return config, err
+	if err = yaml.Unmarshal(configFileContent, &conf); err != nil {
+		return conf, err
 	}
 
-	if config.Azuread.ClientId == "" {
-		return config, fmt.Errorf("missing azuread.clientId")
+	if conf.AzureAd.ClientId == "" {
+		return conf, fmt.Errorf("missing azuread.clientId")
 	}
 
-	return config, nil
+	if conf.OpenVpn.AuthMode != "openurl" && conf.OpenVpn.AuthMode != "webauth" {
+		return conf, fmt.Errorf("openvpn.authMode must be 'openurl' or 'webauth'")
+	}
+
+	return conf, nil
 }

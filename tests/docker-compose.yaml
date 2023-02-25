@@ -1,108 +1,100 @@
 version: '3'
 services:
-  openvpn26:
-    image: openvpn:2.6
-    init: true
-    cap_add:
-      - NET_ADMIN
-    ports:
-      - "0.0.0.0:1194:1194/udp"
-      - "8080:8080/tcp"
-      - "8081:8081/tcp"
-    volumes:
-      - ./openvpn26:/etc/openvpn
-      - ../v2/main:/main
-      - ../v2/openvpn-auth-azure-ad.yaml:/etc/openvpn/openvpn-auth-azure-ad.yaml
-    restart: always
-    environment:
-      DEBUG: 1
-      OVPN_DEFROUTE: 0
-      OVPN_NAT: 0
-      EASYRSA_BATCH: 1
-      UPN: "${UPN}"
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |-
-        chmod +x /main
-
-        if [ ! -f /etc/openvpn/openvpn.conf ]; then
-          initopenvpn -u udp://localhost
-          sed -i '/comp-lzo/d' /etc/openvpn/openvpn.conf
-          sed -i '/cipher.*/d' /etc/openvpn/openvpn.conf
-          sed -i '/.*dhcp-option DNS.*/d' /etc/openvpn/openvpn.conf
-          sed -i '/mute 20/d' /etc/openvpn/openvpn.conf
-          echo 'reneg-sec 120' >> /etc/openvpn/openvpn.conf
-          echo 'script-security 3' >> /etc/openvpn/openvpn.conf
-          echo 'auth-user-pass-verify "/main /etc/openvpn/openvpn-auth-azure-ad.yaml" via-file' >> /etc/openvpn/openvpn.conf
-        fi
-
-        if [ ! -f /etc/openvpn/pki/ca.crt ];
-          then initpki nopass;
-        fi;
-
-        if [ ! -f /etc/openvpn/${UPN}.ovpn ]; then
-          easyrsa build-client-full ${UPN} nopass
-          getclient ${UPN} > /etc/openvpn/${UPN}.ovpn
-
-          sed -i '/redirect-gateway def1/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/verify-x509-name.*/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/comp-lzo/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/cipher.*/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/push "block-outside-dns"/d' /etc/openvpn/${UPN}.ovpn
-          echo auth-user-pass >> /etc/openvpn/${UPN}.ovpn
-          echo verb 3 >> /etc/openvpn/${UPN}.ovpn
-        fi
-        exec startopenvpn
-
   openvpn:
-    image: martin/openvpn
+    init: true
+    image: alpine:edge
     cap_add:
       - NET_ADMIN
+    devices:
+      - /dev/net/tun
     ports:
       - "0.0.0.0:1194:1194/udp"
       - "8080:8080/tcp"
       - "8081:8081/tcp"
     volumes:
-      - ./openvpn:/etc/openvpn
+      - ./data:/etc/openvpn
+      - ./openvpn-auth-azure-ad:/usr/local/bin/openvpn-auth-azure-ad
+      - ../conf/openvpn-auth-azure-ad.yaml:/etc/openvpn-auth-azure-ad.yaml
     restart: always
     environment:
-      EASYRSA_REQ_CN: localhost
+      EASYRSA: /usr/local/share/easy-rsa/easyrsa3
+      EASYRSA_PKI: /etc/openvpn/pki
+      EASYRSA_VARS_FILE: /etc/openvpn/vars
       EASYRSA_BATCH: 1
+      EASYRSA_NO_PASS: 1
+      EASYRSA_ALGO: "ed"
+      EASYRSA_DN: "cn_only"
       UPN: "${UPN}"
     entrypoint:
       - /bin/sh
-      - -c
+      - -ec
       - |-
-        if [ ! -f /etc/openvpn/openvpn.conf ]; then
-          initopenvpn -u udp://localhost
-          sed -i '/comp-lzo/d' /etc/openvpn/openvpn.conf
-          sed -i '/cipher.*/d' /etc/openvpn/openvpn.conf
-          sed -i '/.*dhcp-option DNS.*/d' /etc/openvpn/openvpn.conf
+        chmod +x /usr/local/bin/openvpn-auth-azure-ad
 
-          echo 'management 0.0.0.0 8081' >> /etc/openvpn/openvpn.conf
-          echo 'management-hold' >> /etc/openvpn/openvpn.conf
-          echo 'management-client-auth' >> /etc/openvpn/openvpn.conf
-          echo 'reneg-sec 60' >> /etc/openvpn/openvpn.conf
+        if ! command -v openvpn >/dev/null; then
+          apk add --no-cache openvpn openssl
         fi
 
-        if [ ! -f /etc/openvpn/pki/ca.crt ];
-          then initpki nopass;
-        fi;
+        if [ ! -f /etc/openvpn/pki/ca.crt ]; then
+          apk add --no-cache git bash
+          git -c advice.detachedHead=false clone -b v3.1.2 --depth 1 https://github.com/OpenVPN/easy-rsa.git /usr/local/share/easy-rsa/
+          ln -s /usr/local/share/easy-rsa/easyrsa3/easyrsa /usr/local/bin
+          chmod 755 /usr/local/bin/easyrsa
 
-        if [ ! -f /etc/openvpn/${UPN}.ovpn ]; then
-          easyrsa build-client-full ${UPN} nopass
-          getclient ${UPN} > /etc/openvpn/${UPN}.ovpn
-
-          sed -i '/redirect-gateway def1/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/verify-x509-name.*/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/comp-lzo/d' /etc/openvpn/${UPN}.ovpn
-          sed -i '/cipher.*/d' /etc/openvpn/${UPN}.ovpn
-          echo auth-user-pass >> /etc/openvpn/${UPN}.ovpn
-          echo auth-retry interact >> /etc/openvpn/${UPN}.ovpn
+          easyrsa init-pki
+          easyrsa build-ca
+          easyrsa build-server-full server
+          easyrsa build-client-full ${UPN}
         fi
-        exec startopenvpn
 
-volumes:
-  openvpn_data:
-  socket:
+        cat > "/etc/openvpn/openvpn.conf" <<EOF
+        dev tun0
+        server 100.64.0.0 255.255.255.0
+        verb 3
+        ca /etc/openvpn/pki/ca.crt
+        key /etc/openvpn/pki/private/server.key
+        cert /etc/openvpn/pki/issued/server.crt
+        dh none
+        keepalive 10 60
+        persist-key
+        persist-tun
+
+        tls-cert-profile preferred
+
+        topology subnet
+        proto udp
+        port 1194
+
+        fast-io
+        user nobody
+        group nogroup
+
+        reneg-sec 60
+        script-security 3
+        auth-user-pass-verify "/usr/local/bin/openvpn-auth-azure-ad /etc/openvpn-auth-azure-ad.yaml" via-file
+        auth-user-pass-optional
+        auth-gen-token 300 120
+        EOF
+
+        cat > "/etc/openvpn/${UPN}.ovpn" <<EOF
+        client
+        dev tun
+        nobind
+        remote localhost 1194 udp4
+        remote-cert-tls server
+        resolv-retry infinite
+        tls-cert-profile preferred
+        persist-tun
+        verb 3
+        <key>
+        $(cat /etc/openvpn/pki/private/${UPN}.key)
+        </key>
+        <cert>
+        $(openssl x509 -in /etc/openvpn/pki/issued/${UPN}.crt)
+        </cert>
+        <ca>
+        $(cat /etc/openvpn/pki/ca.crt)
+        </ca>
+        EOF
+
+        exec openvpn --config "/etc/openvpn/openvpn.conf"

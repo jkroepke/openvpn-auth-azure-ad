@@ -3,13 +3,13 @@
 
 # openvpn-auth-azure-ad
 
-openvpn-auth-azure-ad is an external service connects to the openvpn management interface and handle the authentication
+openvpn-auth-azure-ad is an program that gets executed by openvpn server and handle the authentication
 of connecting users against Azure AD.
 
 ## Version requirements
 
-Server: 2.6
-Client: 2.5
+Server: 2.6.0
+Client: 2.5.0
 
 ## Tested environment
 
@@ -24,28 +24,26 @@ Client: 2.5
 - [OpenVPN Community Client for Windows 2.6.0](https://openvpn.net/community-downloads/)
 
 #### Non-Working
--
 - [Tunnelblick](https://tunnelblick.net/) - See https://github.com/Tunnelblick/Tunnelblick/issues/676
-
-# Authenticators
-
-Currently, openvpn-auth-azure-ad supports 2 authentication method against Azure AD:
-
-- [device authorization grant flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
-
-Additionally, if enabled openvpn-auth-azure-ad supports OpenVPNs `auth-token` mechanismus to allow users to bypass
-then authenticator above on re-authentications, e.g. due `reneg-sec`.
 
 # Installation
 
-Go to down
+Go to https://github.com/jkroepke/openvpn-auth-azure-ad/releases/latest and download the binary to the openvpn server.
 
-# Usage
+# Configuration
 
-Args that start with '--' (eg. -V) can also be set in a config file (/etc/openvpn-auth-azure-ad/config.conf or ~/.openvpn-auth-azure-ad or
-specified via -c). Config file syntax allows: key=value, flag=true, stuff=[a,b,c] (for details, see syntax at https://goo.gl/R74nmi). If an arg is
-specified in more than one place, then commandline values override environment variables which override config file values which override defaults.
+The binary must be callable by the unix user that runs the OpenVPN server.
 
+A configuration file `/etc/openvpn/openvpn-auth-azure-ad.yaml` needs to be created, using follow pattern:
+
+```yaml
+azuread:
+  clientId: 00000000-0000-0000-0000-000000000000 # App Registration Client ID
+openvpn:
+  urlHelper: https://jkroepke.github.io/openvpn-auth-azure-ad/
+  # Should client certificates CN and Azure AD UPN match?
+  matchUsernameClientCn: true
+```
 
 ## Register an app with AAD
 
@@ -70,7 +68,9 @@ See: https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-
 script-security 3
 auth-user-pass-verify "/usr/local/bin/openvpn-auth-azure-ad /etc/openvpn/openvpn-auth-azure-ad.yaml" via-file
 auth-user-pass-optional
-auth-gen-token
+
+# re-authenticate after 86400 seconds. Set 0 for no expiration.
+auth-gen-token 86400
 ```
 
 ### client.conf

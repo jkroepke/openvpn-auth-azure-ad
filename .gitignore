@@ -4,6 +4,7 @@
 tests/*
 !tests/docker-compose.yaml
 
+/openvpn-auth-azure-ad
 dist/
 
 ### macOS template

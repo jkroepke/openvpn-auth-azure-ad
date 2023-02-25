@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
@@ -18,7 +19,6 @@ import (
 
 const (
 	envVarPendingAuth = "__OPENVPN_AUTH_AAD__START_PENDING_AUTH"
-	envVarUserName    = "__OPENVPN_AUTH_AAD__USERNAME"
 )
 
 var version = "unknown"
@@ -48,7 +48,12 @@ func main() {
 		}
 	} else {
 		if err := startPendingAuthentication(conf); err != nil {
-			log.Fatal(err.Error())
+			log.Fatalf("%s:%s [%s] openvpn-auth-azure-ad: %v",
+				os.Getenv("untrusted_ip"),
+				os.Getenv("untrusted_port"),
+				os.Getenv("common_name"),
+				err,
+			)
 		}
 
 		os.Exit(openvpn.ExitCodeAuthPending)
@@ -56,21 +61,16 @@ func main() {
 }
 
 func startDeviceCodeAuthentication(conf config.Config) error {
-	username, ok := os.LookupEnv(envVarUserName)
-	if !ok {
-		return fmt.Errorf("can't find username environment variable")
-	}
-
-	app, err := public.New(conf.Azuread.ClientId, public.WithAuthority(conf.Azuread.Authority))
+	app, err := public.New(conf.AzureAd.ClientId, public.WithAuthority(conf.AzureAd.Authority))
 
 	if err != nil {
 		return fmt.Errorf("error while create new public client: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(conf.AzureAd.Timeout)*time.Second)
 	defer cancel()
 
-	devCode, err := app.AcquireTokenByDeviceCode(ctx, conf.Azuread.TokenScopes)
+	devCode, err := app.AcquireTokenByDeviceCode(ctx, conf.AzureAd.TokenScopes)
 
 	if err != nil {
 		return fmt.Errorf("error while acquireTokenByDeviceCode: %v", err)
@@ -83,8 +83,16 @@ func startDeviceCodeAuthentication(conf config.Config) error {
 		return fmt.Errorf("error while getting AuthenticationResult: %v", err)
 	}
 
-	if conf.Openvpn.MatchUsername && username != "" && username != result.Account.PreferredUsername {
-		return fmt.Errorf("vpn username does not match AD Username")
+	if conf.OpenVpn.MatchUsernameClientCn {
+		commonName, ok := os.LookupEnv(openvpn.EnvVarCommonName)
+		if !ok {
+			return fmt.Errorf("can't find X509_0_CN environment variable")
+		}
+
+		field := reflect.Indirect(reflect.ValueOf(result.IDToken)).FieldByName(conf.OpenVpn.MatchUsernameTokenField)
+		if commonName != field.String() {
+			return fmt.Errorf("client common_name does not match AD Username")
+		}
 	}
 
 	openvpn.WriteAuthControl(openvpn.ControlCodeAuthSuccess)
@@ -93,27 +101,19 @@ func startDeviceCodeAuthentication(conf config.Config) error {
 }
 
 func startPendingAuthentication(conf config.Config) error {
-	credentialFile := os.Args[2]
-	credentialFileContent, err := os.ReadFile(credentialFile)
-	if err != nil {
-		return fmt.Errorf("credential file does not accessable: %v", err)
-	}
-
-	username := strings.Split(string(credentialFileContent), "\n")[0]
-
-	deviceCode, err := startDeviceCodeAuthProcess(username)
+	deviceCode, err := startDeviceCodeAuthProcess()
 
 	if err != nil {
 		return fmt.Errorf("error starting pending auth process: %v", err)
 	}
 
-	openUrl := fmt.Sprintf("OPENURL:%s?code=%s", conf.Openvpn.UrlHelper, deviceCode)
-	openvpn.WriteAuthPending(100, "openurl", openUrl)
+	openUrl := fmt.Sprintf("%s%s?code=%s", openvpn.ExtraAuthPrefix[conf.OpenVpn.AuthMode], conf.OpenVpn.UrlHelper, deviceCode)
+	openvpn.WriteAuthPending(conf.AzureAd.Timeout+5, conf.OpenVpn.AuthMode, openUrl)
 
 	return nil
 }
 
-func startDeviceCodeAuthProcess(username string) (string, error) {
+func startDeviceCodeAuthProcess() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -121,7 +121,7 @@ func startDeviceCodeAuthProcess(username string) (string, error) {
 
 	cmd := exec.Command(os.Args[0], os.Args[1:]...)
 	cmd.Dir = cwd
-	cmd.Env = append(cmd.Environ(), envVarPendingAuth+"=1", envVarUserName+"="+username)
+	cmd.Env = append(cmd.Environ(), envVarPendingAuth+"=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Stderr = os.Stderr
 

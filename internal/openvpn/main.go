@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	envVarAuthFailedReason = "auth_failed_reason_file"
-	envVarAuthPending      = "auth_pending_file"
-	envVarAuthControlFile  = "auth_control_file"
-	supportedScriptType    = "user-pass-verify"
+	EnvVarCommonName       = "X509_0_CN"
+	EnvVarAuthFailedReason = "auth_failed_reason_file"
+	EnvVarAuthPending      = "auth_pending_file"
+	EnvVarAuthControlFile  = "auth_control_file"
+	SupportedScriptType    = "user-pass-verify"
 
 	ExitCodeAuthSuccess = 0
 	ExitCodeAuthFailed  = 1
@@ -21,21 +22,26 @@ const (
 	ControlCodeAuthSuccess = 1
 )
 
+var ExtraAuthPrefix = map[string]string{
+	"openurl": "OPEN_URL:",
+	"webauth": "WEB_AUTH::",
+}
+
 func CheckEnv() error {
-	if os.Getenv("script_type") != supportedScriptType {
-		return fmt.Errorf("only script_type %s is supported. got: %s", supportedScriptType, os.Getenv("script_type"))
+	if os.Getenv("script_type") != SupportedScriptType {
+		return fmt.Errorf("only script_type %s is supported. got: %s", SupportedScriptType, os.Getenv("script_type"))
 	}
 
-	if _, ok := os.LookupEnv(envVarAuthFailedReason); !ok {
-		return fmt.Errorf("missing env variable %s", envVarAuthFailedReason)
+	if _, ok := os.LookupEnv(EnvVarAuthFailedReason); !ok {
+		return fmt.Errorf("missing env variable %s", EnvVarAuthFailedReason)
 	}
 
-	if _, ok := os.LookupEnv(envVarAuthPending); !ok {
-		return fmt.Errorf("missing env variable %s", envVarAuthPending)
+	if _, ok := os.LookupEnv(EnvVarAuthPending); !ok {
+		return fmt.Errorf("missing env variable %s", EnvVarAuthPending)
 	}
 
-	if _, ok := os.LookupEnv(envVarAuthControlFile); !ok {
-		return fmt.Errorf("missing env variable %s", envVarAuthControlFile)
+	if _, ok := os.LookupEnv(EnvVarAuthControlFile); !ok {
+		return fmt.Errorf("missing env variable %s", EnvVarAuthControlFile)
 	}
 
 	return nil
@@ -44,18 +50,23 @@ func CheckEnv() error {
 func AuthFailedReason(reason string) {
 	WriteAuthFailedReason(reason)
 	WriteAuthControl(ControlCodeAuthFailed)
-	log.Fatal(reason)
+	log.Fatalf("%s:%s [%s] openvpn-auth-azure-ad: %s",
+		os.Getenv("untrusted_ip"),
+		os.Getenv("untrusted_port"),
+		os.Getenv("common_name"),
+		reason,
+	)
 }
 
 func WriteAuthFailedReason(reason string) {
-	err := os.WriteFile(os.Getenv(envVarAuthFailedReason), []byte(reason), 0600)
+	err := os.WriteFile(os.Getenv(EnvVarAuthFailedReason), []byte(reason), 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 func WriteAuthControl(status int) {
-	err := os.WriteFile(os.Getenv(envVarAuthControlFile), []byte(strconv.Itoa(status)), 0600)
+	err := os.WriteFile(os.Getenv(EnvVarAuthControlFile), []byte(strconv.Itoa(status)), 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,7 +74,7 @@ func WriteAuthControl(status int) {
 
 func WriteAuthPending(timeout int, method, extra string) {
 	content := fmt.Sprintf("%d\n%s\n%s", timeout, method, extra)
-	err := os.WriteFile(os.Getenv(envVarAuthPending), []byte(content), 0600)
+	err := os.WriteFile(os.Getenv(EnvVarAuthPending), []byte(content), 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
