@@ -1,6 +1,6 @@
 azuread:
   clientId: 98befe53-8878-4e42-a459-a3256c10c9c2
-  timeout: 30
+  timeout: 120
 openvpn:
   authMode: openurl
   urlHelper: https://jkroepke.github.io/openvpn-auth-azure-ad/

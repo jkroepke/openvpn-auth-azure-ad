@@ -7,26 +7,6 @@ import (
 	"strconv"
 )
 
-const (
-	EnvVarCommonName       = "X509_0_CN"
-	EnvVarAuthFailedReason = "auth_failed_reason_file"
-	EnvVarAuthPending      = "auth_pending_file"
-	EnvVarAuthControlFile  = "auth_control_file"
-	SupportedScriptType    = "user-pass-verify"
-
-	ExitCodeAuthSuccess = 0
-	ExitCodeAuthFailed  = 1
-	ExitCodeAuthPending = 2
-
-	ControlCodeAuthFailed  = 0
-	ControlCodeAuthSuccess = 1
-)
-
-var ExtraAuthPrefix = map[string]string{
-	"openurl": "OPEN_URL:",
-	"webauth": "WEB_AUTH::",
-}
-
 func CheckEnv() error {
 	if os.Getenv("script_type") != SupportedScriptType {
 		return fmt.Errorf("only script_type %s is supported. got: %s", SupportedScriptType, os.Getenv("script_type"))
@@ -51,9 +31,9 @@ func AuthFailedReason(reason string) {
 	WriteAuthFailedReason(reason)
 	WriteAuthControl(ControlCodeAuthFailed)
 	log.Fatalf("%s:%s [%s] openvpn-auth-azure-ad: %s",
-		os.Getenv("untrusted_ip"),
-		os.Getenv("untrusted_port"),
-		os.Getenv("common_name"),
+		os.Getenv(EnvVarClientIp),
+		os.Getenv(EnvVarClientPort),
+		os.Getenv(EnvVarCommonName),
 		reason,
 	)
 }
@@ -73,7 +53,7 @@ func WriteAuthControl(status int) {
 }
 
 func WriteAuthPending(timeout int, method, extra string) {
-	content := fmt.Sprintf("%d\n%s\n%s", timeout, method, extra)
+	content := fmt.Sprintf("%d\n%s\n%s\n", timeout, method, extra)
 	err := os.WriteFile(os.Getenv(EnvVarAuthPending), []byte(content), 0600)
 	if err != nil {
 		log.Fatal(err)

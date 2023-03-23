@@ -2,7 +2,9 @@ version: '3'
 services:
   openvpn:
     init: true
-    image: alpine:edge
+    image: local/openvpn
+    build:
+      dockerfile: Dockerfile
     cap_add:
       - NET_ADMIN
     devices:
@@ -58,6 +60,7 @@ services:
         keepalive 10 60
         persist-key
         persist-tun
+        explicit-exit-notify
 
         tls-cert-profile preferred
 
@@ -69,11 +72,11 @@ services:
         user nobody
         group nogroup
 
-        reneg-sec 60
+        reneg-sec 120
         script-security 3
         auth-user-pass-verify "/usr/local/bin/openvpn-auth-azure-ad /etc/openvpn-auth-azure-ad.yaml" via-file
         auth-user-pass-optional
-        auth-gen-token 300 120
+        auth-gen-token
         EOF
 
         cat > "/etc/openvpn/${UPN}.ovpn" <<EOF

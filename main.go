@@ -49,9 +49,9 @@ func main() {
 	} else {
 		if err := startPendingAuthentication(conf); err != nil {
 			log.Fatalf("%s:%s [%s] openvpn-auth-azure-ad: %v",
-				os.Getenv("untrusted_ip"),
-				os.Getenv("untrusted_port"),
-				os.Getenv("common_name"),
+				os.Getenv(openvpn.EnvVarClientIp),
+				os.Getenv(openvpn.EnvVarClientPort),
+				os.Getenv(openvpn.EnvVarCommonName),
 				err,
 			)
 		}

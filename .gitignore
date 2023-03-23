@@ -3,6 +3,8 @@
 
 tests/*
 !tests/docker-compose.yaml
+!tests/Dockerfile
+!tests/.dockerignore
 
 /openvpn-auth-azure-ad
 dist/
