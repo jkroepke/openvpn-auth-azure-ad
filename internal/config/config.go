@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	AzureAdAuthority               string   `env:"AZURE_AD_AUTHORITY" envDefault:"https://login.microsoftonline.com/organizations"`
-	AzureAdTimeout                 int      `env:"AZURE_AD_TIMEOUT" envDefault:"300"`
-	AzureAdClientId                string   `env:"AZURE_AD_CLIENT_ID"`
-	AzureAdTokenScopes             []string `env:"AZURE_AD_TOKEN_SCOPES" envDefault:"user.read" envSeparator:","`
-	OpenVpnUrlHelper               url.URL  `env:"OPENVPN_URL_HELPER" envDefault:"https://jkroepke.github.io/openvpn-auth-azure-ad/"`
-	OpenVpnMatchUsernameClientCn   bool     `env:"OPENVPN_MATCH_USERNAME_CLIENT_CN" envDefault:"true"`
-	OpenVpnMatchUsernameTokenField string   `env:"OPENVPN_MATCH_USERNAME_TOKEN_FIELD" envDefault:"PreferredUsername"`
+	AzureAdAuthority                      string   `env:"AZURE_AD_AUTHORITY" envDefault:"https://login.microsoftonline.com/organizations"`
+	AzureAdTimeout                        int      `env:"AZURE_AD_TIMEOUT" envDefault:"300"`
+	AzureAdClientId                       string   `env:"AZURE_AD_CLIENT_ID"`
+	AzureAdTokenScopes                    []string `env:"AZURE_AD_TOKEN_SCOPES" envDefault:"user.read" envSeparator:","`
+	AzureAdOpenVpnUrlHelper               url.URL  `env:"AZURE_AD_OPENVPN_URL_HELPER" envDefault:"https://jkroepke.github.io/openvpn-auth-azure-ad/"`
+	AzureAdOpenVpnMatchUsernameClientCn   bool     `env:"AZURE_AD_OPENVPN_MATCH_USERNAME_CLIENT_CN" envDefault:"true"`
+	AzureAdOpenVpnMatchUsernameTokenField string   `env:"AZURE_AD_OPENVPN_MATCH_USERNAME_TOKEN_FIELD" envDefault:"PreferredUsername"`
+	AzureAdOpenVpnCnBypassAzureAd         []string `env:"AZURE_AD_OPENVPN_CN_BYPASS_AZURE_AD" envDefault:""  envSeparator:","`
 }
 
 func LoadConfig() (Config, error) {

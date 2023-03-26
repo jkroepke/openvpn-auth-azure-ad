@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/public"
 	"github.com/jkroepke/openvpn-auth-azure-ad/internal/config"
 	"github.com/jkroepke/openvpn-auth-azure-ad/internal/openvpn"
@@ -40,6 +42,15 @@ func main() {
 	conf, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Can't read config: %v", err)
+	}
+
+	if commonName, ok := os.LookupEnv(openvpn.EnvVarCommonName); ok && slices.Contains(conf.AzureAdOpenVpnCnBypassAzureAd, commonName) {
+		log.Printf("%s:%s [%s] openvpn-auth-azure-ad: %v",
+			os.Getenv(openvpn.EnvVarClientIp),
+			os.Getenv(openvpn.EnvVarClientPort),
+			os.Getenv(openvpn.EnvVarCommonName),
+			"skip azure ad authentification",
+		)
 	}
 
 	if _, ok := os.LookupEnv(envVarPendingAuth); ok {
@@ -83,13 +94,13 @@ func startDeviceCodeAuthentication(conf config.Config) error {
 		return fmt.Errorf("error while getting AuthenticationResult: %v", err)
 	}
 
-	if conf.OpenVpnMatchUsernameClientCn {
+	if conf.AzureAdOpenVpnMatchUsernameClientCn {
 		commonName, ok := os.LookupEnv(openvpn.EnvVarCommonName)
 		if !ok {
 			return fmt.Errorf("can't find X509_0_CN environment variable")
 		}
 
-		field := reflect.Indirect(reflect.ValueOf(result.IDToken)).FieldByName(conf.OpenVpnMatchUsernameTokenField)
+		field := reflect.Indirect(reflect.ValueOf(result.IDToken)).FieldByName(conf.AzureAdOpenVpnMatchUsernameTokenField)
 		if commonName != field.String() {
 			return fmt.Errorf("client common_name does not match AD Username")
 		}
@@ -113,7 +124,7 @@ func startPendingAuthentication(conf config.Config) error {
 		return fmt.Errorf("client doesn't support 'webauth'")
 	}
 
-	openUrl := fmt.Sprintf("WEB_AUTH::%s?code=%s", conf.OpenVpnUrlHelper.String(), deviceCode)
+	openUrl := fmt.Sprintf("WEB_AUTH::%s?code=%s", conf.AzureAdOpenVpnUrlHelper.String(), deviceCode)
 	err = openvpn.WriteAuthPending(conf.AzureAdTimeout, "webauth", openUrl)
 
 	if err != nil {
