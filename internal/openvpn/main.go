@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func CheckEnv() error {
@@ -28,6 +29,8 @@ func CheckEnv() error {
 }
 
 func AuthFailedReason(reason string) {
+	reason = strings.TrimSpace(reason)
+
 	WriteAuthFailedReason(reason)
 	WriteAuthControl(ControlCodeAuthFailed)
 	log.Fatalf("%s:%s [%s] openvpn-auth-azure-ad: %s",
@@ -52,10 +55,11 @@ func WriteAuthControl(status int) {
 	}
 }
 
-func WriteAuthPending(timeout int, method, extra string) {
+func WriteAuthPending(timeout int, method, extra string) error {
 	content := fmt.Sprintf("%d\n%s\n%s\n", timeout, method, extra)
 	err := os.WriteFile(os.Getenv(EnvVarAuthPending), []byte(content), 0600)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }

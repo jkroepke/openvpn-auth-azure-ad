@@ -2,60 +2,31 @@ package config
 
 import (
 	"fmt"
-	"os"
-
-	"gopkg.in/yaml.v3"
+	"github.com/caarlos0/env/v7"
+	"net/url"
 )
 
 type Config struct {
-	AzureAd AzureAd `yaml:"azuread"`
-	OpenVpn OpenVpn `yaml:"openvpn"`
-}
-type AzureAd struct {
-	Authority   string   `yaml:"authority"`
-	Timeout     int      `yaml:"timeout"`
-	TokenScopes []string `yaml:"tokenScopes"`
-	ClientId    string   `yaml:"clientId"`
-}
-type OpenVpn struct {
-	AuthMode                string `yaml:"authMode"`
-	UrlHelper               string `yaml:"urlHelper"`
-	MatchUsernameClientCn   bool   `yaml:"matchUsernameClientCn"`
-	MatchUsernameTokenField string `yaml:"matchUsernameTokenField"`
+	AzureAdAuthority               string   `env:"AZURE_AD_AUTHORITY" envDefault:"https://login.microsoftonline.com/organizations"`
+	AzureAdTimeout                 int      `env:"AZURE_AD_TIMEOUT" envDefault:"300"`
+	AzureAdClientId                string   `env:"AZURE_AD_CLIENT_ID"`
+	AzureAdTokenScopes             []string `env:"AZURE_AD_TOKEN_SCOPES" envDefault:"user.read" envSeparator:","`
+	OpenVpnUrlHelper               url.URL  `env:"OPENVPN_URL_HELPER" envDefault:"https://jkroepke.github.io/openvpn-auth-azure-ad/"`
+	OpenVpnMatchUsernameClientCn   bool     `env:"OPENVPN_MATCH_USERNAME_CLIENT_CN" envDefault:"true"`
+	OpenVpnMatchUsernameTokenField string   `env:"OPENVPN_MATCH_USERNAME_TOKEN_FIELD" envDefault:"PreferredUsername"`
 }
 
-func LoadConfig(configFile string) (Config, error) {
-	conf := Config{
-		AzureAd: AzureAd{
-			ClientId:    "",
-			Timeout:     30,
-			TokenScopes: []string{"user.read"},
-			Authority:   "https://login.microsoftonline.com/organizations",
-		},
-		OpenVpn: OpenVpn{
-			AuthMode:                "openurl",
-			UrlHelper:               "https://jkroepke.github.io/openvpn-auth-azure-ad/",
-			MatchUsernameClientCn:   true,
-			MatchUsernameTokenField: "PreferredUsername",
-		},
-	}
+func LoadConfig() (Config, error) {
+	conf := Config{}
+	opts := env.Options{RequiredIfNoDef: true}
 
-	configFileContent, err := os.ReadFile(configFile)
-
-	if err != nil {
+	// Load env vars.
+	if err := env.Parse(&conf, opts); err != nil {
 		return conf, err
 	}
 
-	if err = yaml.Unmarshal(configFileContent, &conf); err != nil {
-		return conf, err
-	}
-
-	if conf.AzureAd.ClientId == "" {
+	if conf.AzureAdClientId == "" {
 		return conf, fmt.Errorf("missing azuread.clientId")
-	}
-
-	if conf.OpenVpn.AuthMode != "openurl" && conf.OpenVpn.AuthMode != "webauth" {
-		return conf, fmt.Errorf("openvpn.authMode must be 'openurl' or 'webauth'")
 	}
 
 	return conf, nil

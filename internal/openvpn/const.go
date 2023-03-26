@@ -8,6 +8,7 @@ const (
 	EnvVarClientIp         = "untrusted_ip"
 	EnvVarClientPort       = "untrusted_port"
 	SupportedScriptType    = "user-pass-verify"
+	IvSso                  = "IV_SSO"
 
 	ExitCodeAuthSuccess = 0
 	ExitCodeAuthFailed  = 1
@@ -16,8 +17,3 @@ const (
 	ControlCodeAuthFailed  = 0
 	ControlCodeAuthSuccess = 1
 )
-
-var ExtraAuthPrefix = map[string]string{
-	"openurl": "OPEN_URL:",
-	"webauth": "WEB_AUTH::",
-}

@@ -16,7 +16,6 @@ services:
     volumes:
       - ./data:/etc/openvpn
       - ./openvpn-auth-azure-ad:/usr/local/bin/openvpn-auth-azure-ad
-      - ../conf/openvpn-auth-azure-ad.yaml:/etc/openvpn-auth-azure-ad.yaml
     restart: always
     environment:
       EASYRSA: /usr/local/share/easy-rsa/easyrsa3
@@ -72,11 +71,17 @@ services:
         user nobody
         group nogroup
 
-        reneg-sec 120
+
+        setenv AZURE_AD_CLIENT_ID 98befe53-8878-4e42-a459-a3256c10c9c2
+
+        reneg-sec 60
         script-security 3
-        auth-user-pass-verify "/usr/local/bin/openvpn-auth-azure-ad /etc/openvpn-auth-azure-ad.yaml" via-file
+        #auth-user-pass-verify "/bin/true" via-env
+        auth-user-pass-verify /usr/local/bin/openvpn-auth-azure-ad via-file
         auth-user-pass-optional
-        auth-gen-token
+        auth-gen-token 300 120
+        auth-token-user YXV0aC10b2tlbg==
+        push "auth-token-user YXV0aC10b2tlbg=="
         EOF
 
         cat > "/etc/openvpn/${UPN}.ovpn" <<EOF
