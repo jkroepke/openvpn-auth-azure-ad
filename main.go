@@ -97,13 +97,24 @@ func startDeviceCodeAuthentication(conf config.Config) error {
 	if conf.AzureAdOpenVpnMatchUsernameClientCn {
 		commonName, ok := os.LookupEnv(openvpn.EnvVarCommonName)
 		if !ok {
-			return fmt.Errorf("can't find X509_0_CN environment variable")
+			return fmt.Errorf("can't find %s environment variable", openvpn.EnvVarCommonName)
 		}
 
 		field := reflect.Indirect(reflect.ValueOf(result.IDToken)).FieldByName(conf.AzureAdOpenVpnMatchUsernameTokenField)
 		if commonName != field.String() {
 			return fmt.Errorf("client common_name does not match AD Username")
 		}
+	}
+
+	if conf.AzureAdOpenVpnMatchClientIp {
+		// clientIp, ok := os.LookupEnv(openvpn.EnvVarClientIp)
+		// if !ok {
+		// 	return fmt.Errorf("can't find %s environment variable", openvpn.EnvVarClientIp)
+		// }
+		//
+		// if result.IDToken.IpAddress != clientIp {
+		//     return fmt.Errorf("client ip from OpenVPN and AzureAD are different. OpenVPN: %s, AzureAD: %s", clientIp, result.IDToken.IpAddress)
+		// }
 	}
 
 	openvpn.WriteAuthControl(openvpn.ControlCodeAuthSuccess)
@@ -160,7 +171,7 @@ func startDeviceCodeAuthProcess() (string, error) {
 	deviceCode := scanner.Text()
 
 	if strings.TrimSpace(deviceCode) == "" {
-		return "", err
+		return "", fmt.Errorf("unable to gain device code. Check server logs")
 	}
 
 	if err := stdout.Close(); err != nil {
