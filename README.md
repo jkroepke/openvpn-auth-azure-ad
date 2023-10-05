@@ -6,7 +6,7 @@
 
 # openvpn-auth-azure-ad
 
-State: Proof of concept!
+# State: Discontinued - Follow up project: https://github.com/jkroepke/openvpn-auth-oauth2
 
 openvpn-auth-azure-ad is an external service connects to the openvpn management interface and handle the authentication
 of connecting users against Azure AD.
